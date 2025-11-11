@@ -38,13 +38,14 @@ env/
 .env.local
 .env.*.local
 
-# IDEs
+# IDEs & Editors
 .vscode/
 .idea/
 *.swp
 *.swo
+*.bak
 *~
-.DS_Store
+*~.nib
 
 # Node
 node_modules/
@@ -74,23 +75,24 @@ backend/*.exe
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 lerna-debug.log*
-
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
 
 # Temporary files
 *.tmp
 *.temp
 *.cache
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+chroma_db/
+chromadb/
+uploads/
+
 # Redis
 dump.rdb
+*.rdb
 
 # Test coverage
 .coverage
@@ -104,3 +106,18 @@ htmlcov/
 
 # Vite
 .vite/
+
+# Jupyter Notebooks
+*.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
