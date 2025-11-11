@@ -1,0 +1,21 @@
+
+# Core
+fastapi
+uvicorn
+python-multipart
+redis==4.6.0
+numpy
+tqdm
+PyPDF2
+pdf2image
+pytesseract
+
+# OpenAI (cloud-based embeddings + chat)
+openai
+
+# Ollama (local embeddings + chat)
+ollama
+
+# Utilities
+python-dotenv
+jupyter

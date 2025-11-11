@@ -1,0 +1,57 @@
+{
+  "name": "myapp",
+  "version": "0.1.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev:react": "vite",
+    "dev:electron": "tsc -p ./tsconfig.json --watch",
+    "start:electron": "electronmon ./dist/main.js",
+    "start": "concurrently \"npm run dev:react\" \"wait-on http://localhost:5173 && npm run start:electron\"",
+    "build:react": "vite build",
+    "build:electron": "tsc -p ./tsconfig.json",
+    "build": "npm run build:react && npm run build:electron",
+    "prepackage": "node ./scripts/prePackage.js",
+    "package": "electron-builder"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.16",
+    "@types/node": "^24.7.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
+    "electron": "^26.6.10",
+    "electron-builder": "^24.6.0",
+    "electronmon": "^2.0.3",
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9",
+    "wait-on": "^9.0.1"
+  },
+  "build": {
+    "icon": "assets/icons/app_icon",
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "assets/**/*"
+    ],
+    "appId": "com.myapp.desktop",
+    "extraResources": [
+      {
+        "from": "dist/backend.exe",
+        "to": "backend.exe"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  },
+  "dependencies": {
+    "lucide-react": "^0.546.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-feather": "^2.0.10",
+    "react-router-dom": "^7.9.4"
+  }
+}
