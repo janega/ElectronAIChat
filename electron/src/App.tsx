@@ -35,7 +35,7 @@ export default function App() {
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [backendConnected, setBackendConnected] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null!);
 
   const currentChat = getCurrentChat();
 
@@ -102,6 +102,7 @@ export default function App() {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('chatId', currentChatId);
+        formData.append('userId', 'default-user');
 
         const result = await apiClient.uploadDocument(formData);
         setUploadedDocs((prev) => [...prev, result.document]);

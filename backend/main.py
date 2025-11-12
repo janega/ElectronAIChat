@@ -123,7 +123,7 @@ async def root():
             "memories": "Mem0 (ChromaDB)"
         },
         "endpoints": {
-            "status": "/api/status (legacy)",
+            "status": "/api/status",
             "health": "/api/health",
             "chat_stream": "/api/chat/stream",
             "documents_upload": "/documents/upload",

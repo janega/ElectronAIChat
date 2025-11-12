@@ -34,24 +34,26 @@ export function useChat() {
       try {
         let fullResponse = '';
 
-        const url = `api/documents/chat/stream?${new URLSearchParams({
+        // Updated to match new backend ChatRequest model
+        const payload = {
           chatId,
+          userId: 'default-user', // TODO: Replace with actual user ID
           message: content,
           searchMode,
-          documentIds: documentIds.join(','),
           model: settings.model,
-          temperature: String(settings.temperature),
-          maxTokens: String(settings.maxTokens),
+          temperature: settings.temperature,
+          maxTokens: settings.maxTokens,
           systemPrompt: settings.systemPrompt,
-        }).toString()}`;
+          useMemory: true,
+        };
 
         if (cleanupRef.current) {
           cleanupRef.current();
         }
 
         cleanupRef.current = apiClient.streamResponse(
-          url,
-          {},
+          '/api/chat/stream',
+          payload,
           (chunk) => {
             fullResponse += chunk.token || chunk.content || '';
             
