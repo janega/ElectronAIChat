@@ -30,7 +30,7 @@ async def create_chat(chat_data: ChatCreate, session: DBSession):
         session.commit()
         session.refresh(chat)
         
-        logger.info(f"✅ Created chat: {chat.title} (ID: {chat.id}) for user: {chat_data.user_id}")
+        logger.info(f"Created chat: {chat.title} (ID: {chat.id}) for user: {chat_data.user_id}")
         
         return ChatResponse(
             id=chat.id,
@@ -124,7 +124,7 @@ async def update_chat(chat_id: str, title: Optional[str] = None, search_mode: Op
         session.add(chat)
         session.commit()
         
-        logger.info(f"✅ Updated chat: {chat_id} ({', '.join(updated_fields)})")
+        logger.info(f"Updated chat: {chat_id} ({', '.join(updated_fields)})")
         return {"success": True, "chat_id": chat_id, "updated_fields": updated_fields}
     except HTTPException:
         raise
@@ -148,7 +148,7 @@ async def delete_chat(chat_id: str, session: DBSession):
         session.delete(chat)
         session.commit()
         
-        logger.info(f"✅ Deleted chat: {chat_id} ({message_count} messages, {document_count} documents)")
+        logger.info(f"Deleted chat: {chat_id} ({message_count} messages, {document_count} documents)")
         return {"success": True, "deleted": chat_id, "messages_deleted": message_count, "documents_deleted": document_count}
     except HTTPException:
         raise

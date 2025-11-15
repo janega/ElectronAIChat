@@ -28,9 +28,9 @@ def create_db_and_tables():
     """
     try:
         SQLModel.metadata.create_all(engine)
-        logger.info(f"✅ Database initialized: {DATABASE_PATH}")
+        logger.info(f"Database initialized: {DATABASE_PATH}")
     except Exception as e:
-        logger.exception(f"❌ Failed to create database tables: {e}")
+        logger.exception(f"Failed to create database tables: {e}")
         raise
 
 

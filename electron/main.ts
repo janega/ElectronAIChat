@@ -141,7 +141,7 @@ app.whenReady().then(async () => {
   startBackend();
 
   try {
-    await waitForHealth("http://127.0.0.1:8000/api/status", 20000);
+    await waitForHealth("http://127.0.0.1:8000/api/health", 50000);
     console.log("✅ Backend is ready, launching window...");
     createWindow();
   } catch (err) {

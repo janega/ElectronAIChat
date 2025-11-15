@@ -118,16 +118,16 @@ class Mem0MemoryManager:
         if Memory is not None:
             try:
                 self.memory = Memory.from_config(config)
-                logger.info(f"✅ mem0 Memory initialized successfully with provider: {PROVIDER}")
+                logger.info(f"mem0 Memory initialized successfully with provider: {PROVIDER}")
             except TypeError as e:
                 # Config schema mismatch - mem0 may have different version requirements
                 logger.warning(
-                    f"⚠️ mem0 config schema error (likely version mismatch): {str(e)[:100]}"
+                    f"mem0 config schema error (likely version mismatch): {str(e)[:100]}"
                 )
                 logger.info("Falling back to in-memory MemoryStub")
                 self.memory = MemoryStub()
             except Exception as e:
-                logger.exception(f"❌ mem0 initialization failed: {type(e).__name__}")
+                logger.exception(f"mem0 initialization failed: {type(e).__name__}")
                 logger.info("Falling back to in-memory MemoryStub")
                 self.memory = MemoryStub()
         else:
@@ -147,37 +147,37 @@ class Mem0MemoryManager:
 
         try:
             # Log what we're sending to mem0
-            logger.debug(f"🔍 Adding memory for user={user_id}, role={role}, content_length={len(message)}, content_preview='{message[:100]}'")
+            logger.debug(f"Adding memory for user={user_id}, role={role}, content_length={len(message)}, content_preview='{message[:100]}'")
             
             # mem0 expects messages list objects
             result = self.memory.add(messages=[{"role": role, "content": message}], user_id=user_id, metadata=metadata or {})
             
             # Log mem0's response
             if result and isinstance(result, dict) and result.get('results'):
-                logger.info(f"✅ mem0 add result: {len(result['results'])} memories added")
+                logger.info(f"mem0 add result: {len(result['results'])} memories added")
             elif result and isinstance(result, dict) and 'results' in result and not result['results']:
-                logger.debug(f"ℹ️ mem0 returned empty results (all NOOPs - facts already known)")
+                logger.debug(f"mem0 returned empty results (all NOOPs - facts already known)")
             else:
-                logger.info(f"✅ mem0 add result: {result}")
+                logger.info(f"mem0 add result: {result}")
             return result
         except ValueError as e:
             # ValueError typically means empty embeddings - this is expected when mem0 deduplicates
             error_msg = str(e)
             if "empty" in error_msg.lower() or "embeddings" in error_msg.lower():
-                logger.debug(f"ℹ️ mem0 skipped storage (likely duplicate/NOOP): {error_msg}")
+                logger.debug(f"mem0 skipped storage (likely duplicate/NOOP): {error_msg}")
             else:
-                logger.warning(f"❌ mem0 ValueError: {error_msg}")
+                logger.warning(f"mem0 ValueError: {error_msg}")
             return None
         except Exception as e:
-            logger.warning(f"❌ Failed to add memory: {type(e).__name__}: {str(e)}")
+            logger.warning(f"Failed to add memory: {type(e).__name__}: {str(e)}")
             # Silently continue - memory storage is not critical for chat functionality
             return None
 
     def search_memory(self, user_id: str, query: str, limit: int = 5):
         try:
-            logger.debug(f"🔍 Searching memory for user={user_id}, query='{query[:100]}', limit={limit}")
+            logger.debug(f"Searching memory for user={user_id}, query='{query[:100]}', limit={limit}")
             result = self.memory.search(query=query, user_id=user_id, limit=limit)
-            logger.info(f"✅ mem0 search returned {len(result) if result else 0} results: {result}")
+            logger.info(f"mem0 search returned {len(result) if result else 0} results: {result}")
             return result
         except Exception:
             logger.exception("❌ Memory search failed")

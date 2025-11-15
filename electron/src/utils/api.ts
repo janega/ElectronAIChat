@@ -124,7 +124,7 @@ export class ApiClient {
   }
 
   async checkStatus(): Promise<{ status: string }> {
-    const url = `${this.baseUrl}api/status`;
+    const url = `${this.baseUrl}/api/status`;
     const response = await fetch(url, {
       method: 'GET',
     });
@@ -204,6 +204,36 @@ export class ApiClient {
 
     if (!response.ok) {
       throw new Error(`Failed to delete chat: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async createUser(username: string, email?: string): Promise<any> {
+    const url = `${this.baseUrl}/api/users/create`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, email }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create user: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async getUserByUsername(username: string): Promise<any> {
+    const url = `${this.baseUrl}/api/users/${username}`;
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get user: ${response.status}`);
     }
 
     return response.json();

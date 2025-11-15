@@ -11,11 +11,12 @@ export function useChat() {
     async (
       content: string,
       chatId: string,
+      username: string,
       searchMode: string,
       documentIds: string[],
       settings: AppSettings
     ) => {
-      if (!content.trim() || !chatId) return;
+      if (!content.trim() || !chatId || !username) return;
 
       const userMessage: Message = {
         id: Date.now().toString(),
@@ -37,7 +38,7 @@ export function useChat() {
         // Updated to match new backend ChatRequest model
         const payload = {
           chatId,
-          userId: 'default-user', // TODO: Replace with actual user ID
+          userId: username,
           message: content,
           searchMode,
           model: settings.model,

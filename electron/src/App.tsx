@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Menu, X, Settings, Plus, Sun, Moon, Wifi, WifiOff } from 'lucide-react';
 import { PageType, Document } from './types';
 import { useTheme, useSettings, useChatHistory, useChat } from './hooks';
 import { apiClient } from './utils/api';
+import { SyncProvider, useSyncContext } from './contexts/SyncContext';
 import './styles/globals.css';
 import './styles/utils.css'; 
 import { 
@@ -10,12 +11,21 @@ import {
   MessageInput, 
   ChatControls, 
   Sidebar, 
-  SettingsPage 
+  SettingsPage,
+  UsernameModal
 } from './components/index';
 
-export default function App() {
+function AppContent() {
   const { isDark, setIsDark } = useTheme();
   const { settings, updateSetting } = useSettings();
+  const { 
+    username, 
+    setUsername, 
+    setIsSyncing,
+    setLastSyncTime,
+    setUnsyncedCount
+  } = useSyncContext();
+  
   const {
     chats,
     currentChatId,
@@ -24,7 +34,12 @@ export default function App() {
     updateChat,
     deleteChat,
     getCurrentChat,
-  } = useChatHistory();
+    syncFromBackend,
+    syncUnsyncedChats,
+    isSyncing,
+    isInitialSyncComplete,
+    unsyncedCount,
+  } = useChatHistory(username || undefined);
   const { messages, setMessages, isLoading, sendMessage, cleanup } =
     useChat();
 
@@ -34,10 +49,67 @@ export default function App() {
   const [searchMode, setSearchMode] = useState('normal');
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [backendConnected, setBackendConnected] = useState(false);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null!);
+  const isLoadingChatRef = useRef(false);
 
   const currentChat = getCurrentChat();
+
+  // Initialize app - check for username and trigger initial sync
+  useEffect(() => {
+    const initialize = async () => {
+      // Check if username exists
+      if (!username) {
+        setShowUsernameModal(true);
+        setIsInitializing(false);
+        return;
+      }
+
+      // Username exists, ensure user exists in backend and sync
+      try {
+        setIsSyncing(true);
+        // Create or get user (idempotent - returns existing user if already exists)
+        await apiClient.createUser(username);
+        await syncFromBackend();
+        await syncUnsyncedChats();
+        setLastSyncTime(Date.now());
+      } catch (error) {
+        console.error('Initial sync failed:', error);
+      } finally {
+        setIsSyncing(false);
+        setIsInitializing(false);
+      }
+    };
+
+    initialize();
+  }, []); // Only run once on mount
+
+  // Handle username submission from modal
+  const handleUsernameSet = async (newUsername: string) => {
+    setUsername(newUsername);
+    setShowUsernameModal(false);
+    setIsInitializing(true);
+
+    // Create or get user in backend first
+    try {
+      setIsSyncing(true);
+      await apiClient.createUser(newUsername);
+      await syncFromBackend();
+      setLastSyncTime(Date.now());
+    } catch (error) {
+      console.error('Initial sync failed:', error);
+    } finally {
+      setIsSyncing(false);
+      setIsInitializing(false);
+    }
+  };
+
+  // Update sync context when local state changes
+  useEffect(() => {
+    setUnsyncedCount(unsyncedCount);
+  }, [unsyncedCount, setUnsyncedCount]);
 
   // Check backend status
   const checkBackendStatus = async () => {
@@ -61,16 +133,31 @@ export default function App() {
   // Load current chat
   useEffect(() => {
     if (currentChat) {
+      isLoadingChatRef.current = true;
       setMessages(currentChat.messages);
       setUploadedDocs(currentChat.documents);
       setSearchMode(currentChat.searchMode);
+      // Reset the flag after a brief delay to allow state updates to settle
+      setTimeout(() => {
+        isLoadingChatRef.current = false;
+      }, 0);
     }
-  }, [currentChatId, currentChat]);
+  }, [currentChatId]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
+
+  // Sync messages to chat history whenever they change (but not during chat loading)
+  useEffect(() => {
+    if (!isLoadingChatRef.current && currentChatId && messages.length > 0) {
+      updateChat(currentChatId, {
+        messages,
+        searchMode: searchMode as any,
+      });
+    }
+  }, [messages, currentChatId, searchMode]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -78,31 +165,30 @@ export default function App() {
   }, [messages]);
 
   const handleSendMessage = async (content: string) => {
-    if (!currentChatId) return;
+    if (!currentChatId || !username) return;
 
     await sendMessage(
       content,
       currentChatId,
+      username,
       searchMode,
       uploadedDocs.map((d) => d.id),
       settings
     );
 
-    updateChat(currentChatId, {
-      messages,
-      searchMode: searchMode as any,
-    });
+    // Note: messages state will be updated by useChat hook
+    // We'll sync to chat history in a separate effect
   };
 
   const handleUploadDocument = async (files: FileList | null) => {
-    if (!currentChatId || !files) return;
+    if (!currentChatId || !files || !username) return;
 
     try {
       for (const file of Array.from(files)) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('chatId', currentChatId);
-        formData.append('userId', 'default-user');
+        formData.append('userId', username);
 
         const result = await apiClient.uploadDocument(formData);
         setUploadedDocs((prev) => [...prev, result.document]);
@@ -277,6 +363,43 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* Username Modal */}
+      {showUsernameModal && (
+        <UsernameModal 
+          onUsernameSet={handleUsernameSet}
+          isLoading={isSyncing}
+        />
+      )}
+
+      {/* Loading Overlay during initial sync */}
+      {isInitializing && !showUsernameModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 text-center">
+            <svg className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-gray-900 dark:text-gray-100 text-lg font-medium">
+              Syncing your chats...
+            </p>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Wrap AppContent in SyncProvider
+export default function App() {
+  const handleSyncTrigger = async () => {
+    // This will be called by the SyncContext for manual/auto sync
+    // The actual sync logic is in AppContent via useChatHistory
+  };
+
+  return (
+    <SyncProvider onSyncTrigger={handleSyncTrigger}>
+      <AppContent />
+    </SyncProvider>
   );
 }

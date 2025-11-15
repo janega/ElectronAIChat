@@ -26,7 +26,7 @@ graph TB
 ```bash
 # Terminal 1: Start backend (Python)
 cd backend
-python backend.py  # FastAPI on http://127.0.0.1:8000
+python main.py  # FastAPI on http://127.0.0.1:8000
 
 # Terminal 2: Start Electron + React dev server
 cd electron
@@ -96,7 +96,7 @@ results.sort(reverse=True)[:top_k]
 
 ### Router Initialization Pattern
 ```python
-# backend/backend.py
+# backend/main.py
 app.include_router(
     document_routes.init_router(REDIS_URL, EMBED_MODEL, CHAT_MODEL, OLLAMA_HOST),
     prefix="/api/documents"
@@ -173,7 +173,7 @@ nativeTheme.themeSource = 'light';  // Controlled via IPC 'set-theme'
 
 ## Key Files Reference
 
-- `backend/backend.py` - FastAPI app initialization, router mounting
+- `backend/main.py` - FastAPI app initialization, router mounting
 - `backend/app/services/{document,chat}_service.py` - RAG core logic
 - `backend/utils/pdf_loader.py` - OCR extraction with Tesseract
 - `electron/main.ts` - Electron main process, backend lifecycle

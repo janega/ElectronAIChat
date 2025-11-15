@@ -4,3 +4,4 @@ export { MessageInput } from './MessageInput';
 export { ChatControls } from './ChatControls';
 export { Sidebar } from './Sidebar';
 export { SettingsPage } from './SettingsPage';
+export { UsernameModal } from './UsernameModal';

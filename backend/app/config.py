@@ -45,10 +45,10 @@ USE_APP_DATA_DIR = os.getenv("USE_APP_DATA_DIR", "false").lower() == "true"
 
 if USE_APP_DATA_DIR:
     BASE_DIR = get_app_data_dir()
-    logger.info(f"📁 Using app data directory: {BASE_DIR}")
+    logger.info(f"Using app data directory: {BASE_DIR}")
 else:
     BASE_DIR = Path(os.getenv("BASE_DIR", "."))
-    logger.info(f"📁 Using local directory: {BASE_DIR}")
+    logger.info(f"Using local directory: {BASE_DIR}")
 
 # Upload and persistence directories
 UPLOAD_DIR = (BASE_DIR / "uploads")

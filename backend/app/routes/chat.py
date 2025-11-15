@@ -60,7 +60,9 @@ async def chat_stream(
                     logger.info(f"Chat '{payload.chatId}' not found, creating automatically")
                     
                     # Verify user exists first
-                    user = session.query(User).filter(User.username == payload.userId).first()
+                    
+                    #user = session.query(User).filter(User.username == payload.userId).first()
+                    user = session.get(User, payload.userId)
                     if not user:
                         # Create user if needed
                         user = User(id=payload.userId, username=payload.userId)
@@ -93,7 +95,7 @@ async def chat_stream(
                 )
                 session.add(user_message)
                 session.commit()
-                logger.debug(f"💾 Saved user message to database (chat: {payload.chatId})")
+                logger.debug(f"Saved user message to database (chat: {payload.chatId})")
             except Exception:
                 logger.exception("Failed to save user message to database - continuing")
                 session.rollback()
@@ -119,7 +121,7 @@ async def chat_stream(
             mem0_context = ""
             if payload.useMemory:
                 try:
-                    logger.debug(f"🧠 Retrieving memories for user={payload.userId}")
+                    logger.debug(f"Retrieving memories for user={payload.userId}")
                     relevant_memories = mem0_manager.search_memory(
                         user_id=payload.userId, 
                         query=payload.message, 
@@ -134,14 +136,14 @@ async def chat_stream(
                         memories_list = relevant_memories
                     
                     if memories_list:
-                        logger.info(f"🧠 Found {len(memories_list)} memories")
+                        logger.info(f"Found {len(memories_list)} memories")
                         mem0_context = "\n\n--- User Memory Context ---\n"
                         for mem in memories_list:
                             if isinstance(mem, dict) and "memory" in mem:
                                 mem0_context += f"- {mem['memory']}\n"
-                        logger.info(f"🧠 Memory context built: {mem0_context[:200]}")
+                        logger.info(f"Memory context built: {mem0_context[:200]}")
                     else:
-                        logger.info(f"🧠 No memories found for user={payload.userId}")
+                        logger.info(f"No memories found for user={payload.userId}")
                 except Exception:
                     logger.exception("Memory search failed - continuing without memory context")
 
@@ -177,7 +179,7 @@ async def chat_stream(
                     break
 
             # Log the accumulated response for debugging
-            logger.info(f"💬 Chat complete: user_message_length={len(payload.message)}, response_length={len(full_response)}, response_preview='{full_response[:100]}'")
+            logger.info(f"Chat complete: user_message_length={len(payload.message)}, response_length={len(full_response)}, response_preview='{full_response[:100]}'")
 
             # 5. Save assistant response to database
             try:
@@ -190,7 +192,7 @@ async def chat_stream(
                 )
                 session.add(assistant_message)
                 session.commit()
-                logger.debug(f"💾 Saved assistant response to database (chat: {payload.chatId})")
+                logger.debug(f"Saved assistant response to database (chat: {payload.chatId})")
             except Exception:
                 logger.exception("Failed to save assistant response to database")
                 session.rollback()
@@ -202,7 +204,7 @@ async def chat_stream(
                     try:
                         # Store user message (with validation)
                         if payload.message and payload.message.strip() and len(payload.message.strip()) >= 3:
-                            logger.debug(f"📝 Storing user message: '{payload.message[:100]}'")
+                            logger.debug(f"Storing user message: '{payload.message[:100]}'")
                             await run_in_threadpool(
                                 mem0_manager.add_message,
                                 user_id=payload.userId, 
@@ -210,13 +212,13 @@ async def chat_stream(
                                 role="user",
                                 metadata={"chat_id": payload.chatId}
                             )
-                            logger.info(f"✅ Successfully stored user message in memory (chat: {payload.chatId})")
+                            logger.info(f"Successfully stored user message in memory (chat: {payload.chatId})")
                         else:
-                            logger.warning(f"⚠️ Skipping user message storage: too short or empty")
+                            logger.warning(f"Skipping user message storage: too short or empty")
                         
                         # Store assistant response (with validation)
                         if full_response and full_response.strip() and len(full_response.strip()) >= 3:
-                            logger.debug(f"📝 Storing assistant response: '{full_response[:100]}'")
+                            logger.debug(f"Storing assistant response: '{full_response[:100]}'")
                             await run_in_threadpool(
                                 mem0_manager.add_message,
                                 user_id=payload.userId, 
@@ -224,11 +226,11 @@ async def chat_stream(
                                 role="assistant", 
                                 metadata={"chat_id": payload.chatId}
                             )
-                            logger.info(f"✅ Successfully stored assistant response in memory (chat: {payload.chatId})")
+                            logger.info(f"Successfully stored assistant response in memory (chat: {payload.chatId})")
                         else:
-                            logger.warning(f"⚠️ Skipping assistant response storage: too short or empty (length={len(full_response)})")
+                            logger.warning(f"Skipping assistant response storage: too short or empty (length={len(full_response)})")
                     except Exception as mem_error:
-                        logger.error(f"❌ Memory storage failed for chat {payload.chatId}: {type(mem_error).__name__}: {str(mem_error)}")
+                        logger.error(f"Memory storage failed for chat {payload.chatId}: {type(mem_error).__name__}: {str(mem_error)}")
                         logger.exception("Full memory storage error traceback:")
                 
                 # Fire and forget - don't wait for memory storage

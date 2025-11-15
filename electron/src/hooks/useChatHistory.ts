@@ -3,9 +3,7 @@ import { Chat } from '../types';
 import { STORAGE_KEYS } from '../utils/constants';
 import { apiClient } from '../utils/api';
 
-const DEFAULT_USER_ID = 'default-user'; // TODO: Replace with actual user management
-
-export function useChatHistory() {
+export function useChatHistory(username?: string) {
   const [chats, setChats] = useState<Chat[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CHATS);
     return saved ? JSON.parse(saved) : [];
@@ -17,11 +15,7 @@ export function useChatHistory() {
   });
 
   const [isSyncing, setIsSyncing] = useState(false);
-
-  // Sync with backend on mount
-  useEffect(() => {
-    syncFromBackend();
-  }, []);
+  const [isInitialSyncComplete, setIsInitialSyncComplete] = useState(false);
 
   // Save to localStorage whenever chats change
   useEffect(() => {
@@ -36,9 +30,14 @@ export function useChatHistory() {
 
   // Sync chats from backend
   const syncFromBackend = useCallback(async () => {
+    if (!username) {
+      console.warn('No username provided for sync');
+      return;
+    }
+
     try {
       setIsSyncing(true);
-      const backendChats = await apiClient.getUserChats(DEFAULT_USER_ID);
+      const backendChats = await apiClient.getUserChats(username);
       
       // Merge backend chats with localStorage
       // Backend is source of truth - use backend data if available
@@ -48,74 +47,119 @@ export function useChatHistory() {
 
       // Add all backend chats (they're the source of truth)
       for (const backendChat of backendChats) {
-        // Try to find matching local chat
-        const localChat = localChats.find((c) => c.id === backendChat.id);
+        // Try to find matching local chat (by serverChatId or id)
+        const localChat = localChats.find((c) => 
+          c.serverChatId === backendChat.id || c.id === backendChat.id
+        );
         
-        // If local chat exists and is newer, we might want to sync it up
-        // For now, prefer backend data
+        // Prefer backend data but keep local messages/documents if available
         mergedChats.push({
           id: backendChat.id,
           title: backendChat.title,
-          messages: localChat?.messages || [], // Keep local messages for now
+          messages: localChat?.messages || [],
           documents: localChat?.documents || [],
           searchMode: backendChat.search_mode || 'normal',
           createdAt: backendChat.created_at,
           updatedAt: backendChat.updated_at,
+          isSynced: true,
+          serverChatId: backendChat.id,
         });
       }
 
       // Add local-only chats (not yet synced to backend)
       for (const localChat of localChats) {
-        if (!backendChatIds.has(localChat.id)) {
+        const isLocalOnly = localChat.id.startsWith('local-') && !localChat.isSynced;
+        const notInBackend = localChat.serverChatId && !backendChatIds.has(localChat.serverChatId);
+        
+        if (isLocalOnly || notInBackend) {
           mergedChats.push(localChat);
-          // TODO: Optionally sync to backend here
         }
       }
 
       setChats(mergedChats);
+      setIsInitialSyncComplete(true);
     } catch (error) {
       console.error('Failed to sync from backend:', error);
       // Continue with localStorage data on error
+      setIsInitialSyncComplete(true);
     } finally {
       setIsSyncing(false);
     }
-  }, [chats]);
+  }, [username]);
+
+  // Sync unsynced local chats to backend
+  const syncUnsyncedChats = useCallback(async () => {
+    if (!username) return;
+
+    const unsyncedChats = chats.filter((chat) => !chat.isSynced && chat.id.startsWith('local-'));
+    
+    for (const localChat of unsyncedChats) {
+      try {
+        const backendChat = await apiClient.createChat(username, localChat.title);
+        
+        // Update local chat with server ID
+        setChats((prev) =>
+          prev.map((c) =>
+            c.id === localChat.id
+              ? {
+                  ...c,
+                  serverChatId: backendChat.id,
+                  isSynced: true,
+                  updatedAt: new Date().toISOString(),
+                }
+              : c
+          )
+        );
+      } catch (error) {
+        console.error(`Failed to sync chat ${localChat.id}:`, error);
+        // Continue with next chat
+      }
+    }
+  }, [chats, username]);
 
   const createNewChat = async (): Promise<Chat> => {
-    try {
-      // Create chat on backend first
-      const backendChat = await apiClient.createChat(DEFAULT_USER_ID, 'New Chat');
-      
-      const newChat: Chat = {
-        id: backendChat.id,
-        title: backendChat.title,
-        messages: [],
-        documents: [],
-        searchMode: backendChat.search_mode || 'normal',
-        createdAt: backendChat.created_at,
-        updatedAt: backendChat.updated_at,
-      };
-      
-      setChats((prev) => [newChat, ...prev]);
-      setCurrentChatId(newChat.id);
-      return newChat;
-    } catch (error) {
-      console.error('Failed to create chat on backend, creating locally:', error);
-      
-      // Fallback to local creation if backend fails
-      const newChat: Chat = {
-        id: Date.now().toString(),
-        title: 'New Chat',
-        messages: [],
-        documents: [],
-        searchMode: 'normal',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setChats((prev) => [newChat, ...prev]);
-      setCurrentChatId(newChat.id);
-      return newChat;
+    // Create temporary local chat immediately for instant UI
+    const tempId = `local-${crypto.randomUUID()}`;
+    const newChat: Chat = {
+      id: tempId,
+      title: 'New Chat',
+      messages: [],
+      documents: [],
+      searchMode: 'normal',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isSynced: false,
+    };
+    
+    setChats((prev) => [newChat, ...prev]);
+    setCurrentChatId(tempId);
+
+    // Sync to backend in background
+    if (username) {
+      try {
+        const backendChat = await apiClient.createChat(username, newChat.title);
+        
+        // Update chat with server ID
+        setChats((prev) =>
+          prev.map((c) =>
+            c.id === tempId
+              ? {
+                  ...c,
+                  serverChatId: backendChat.id,
+                  isSynced: true,
+                  createdAt: backendChat.created_at,
+                  updatedAt: backendChat.updated_at,
+                }
+              : c
+          )
+        );
+      } catch (error) {
+        console.error('Failed to sync new chat to backend:', error);
+        // Chat remains local-only with isSynced: false
+      }
     }
+
+    return newChat;
   };
 
   const updateChat = async (chatId: string, updates: Partial<Chat>) => {
@@ -128,40 +172,51 @@ export function useChatHistory() {
       )
     );
 
-    // Sync to backend
-    try {
-      const backendUpdates: any = {};
-      if (updates.title !== undefined) backendUpdates.title = updates.title;
-      if (updates.searchMode !== undefined) backendUpdates.search_mode = updates.searchMode;
-      
-      if (Object.keys(backendUpdates).length > 0) {
-        await apiClient.updateChat(chatId, backendUpdates);
+    // Only sync to backend if chat is already synced
+    const chat = chats.find((c) => c.id === chatId);
+    if (chat?.isSynced && chat.serverChatId) {
+      try {
+        const backendUpdates: any = {};
+        if (updates.title !== undefined) backendUpdates.title = updates.title;
+        if (updates.searchMode !== undefined) backendUpdates.search_mode = updates.searchMode;
+        
+        if (Object.keys(backendUpdates).length > 0) {
+          await apiClient.updateChat(chat.serverChatId, backendUpdates);
+        }
+      } catch (error) {
+        console.error('Failed to sync chat update to backend:', error);
+        // Continue with local update
       }
-    } catch (error) {
-      console.error('Failed to sync chat update to backend:', error);
-      // Continue with local update
     }
   };
 
   const deleteChat = async (chatId: string) => {
+    const chat = chats.find((c) => c.id === chatId);
+    
     // Delete locally first for immediate UI feedback
     setChats((prev) => prev.filter((c) => c.id !== chatId));
     if (currentChatId === chatId) {
-      setCurrentChatId(chats.length > 0 ? chats[0].id : null);
+      const remainingChats = chats.filter((c) => c.id !== chatId);
+      setCurrentChatId(remainingChats.length > 0 ? remainingChats[0].id : null);
     }
 
-    // Delete from backend
-    try {
-      await apiClient.deleteChat(chatId);
-    } catch (error) {
-      console.error('Failed to delete chat from backend:', error);
-      // Chat already removed from local state
+    // Only delete from backend if chat was synced
+    if (chat?.isSynced && chat.serverChatId) {
+      try {
+        await apiClient.deleteChat(chat.serverChatId);
+      } catch (error) {
+        console.error('Failed to delete chat from backend:', error);
+        // Chat already removed from local state
+      }
     }
   };
 
   const getCurrentChat = (): Chat | undefined => {
     return chats.find((c) => c.id === currentChatId);
   };
+
+  // Calculate unsynced count
+  const unsyncedCount = chats.filter((chat) => !chat.isSynced).length;
 
   return {
     chats,
@@ -172,6 +227,9 @@ export function useChatHistory() {
     deleteChat,
     getCurrentChat,
     syncFromBackend,
+    syncUnsyncedChats,
     isSyncing,
+    isInitialSyncComplete,
+    unsyncedCount,
   };
 }

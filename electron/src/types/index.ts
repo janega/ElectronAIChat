@@ -22,6 +22,10 @@ export interface Chat {
   searchMode: 'normal' | 'embeddings' | 'all';
   createdAt: string;
   updatedAt: string;
+  isSynced?: boolean;        // false for local-only chats not yet synced to backend
+  serverChatId?: string;     // real ID from backend (when isSynced becomes true)
+  draftMessage?: string;     // unsent message text preserved across refreshes
+  pendingMessages?: Message[]; // messages queued when backend unreachable
 }
 
 export interface AppSettings {

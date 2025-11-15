@@ -142,7 +142,7 @@ async def upload_document(
             )
             session.add(document)
             session.commit()
-            logger.info(f"💾 Saved document metadata to database: {file.filename} (ID: {file_id})")
+            logger.info(f"Saved document metadata to database: {file.filename} (ID: {file_id})")
         except Exception as e:
             session.rollback()
             logger.exception("Failed to save document metadata - continuing")

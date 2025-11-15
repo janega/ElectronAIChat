@@ -32,6 +32,7 @@ from app.routes.health import router as health_router
 from app.routes.chat import router as chat_router
 from app.routes.documents import router as documents_router
 from app.routes.chats import router as chats_router
+from app.routes.users import router as users_router
 
 # Load environment variables
 load_dotenv()
@@ -88,8 +89,9 @@ app.include_router(health_router)
 app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(chats_router)
+app.include_router(users_router)
 
-
+#TODO remove this endpoint later
 # Legacy status endpoint (for backward compatibility with Electron)
 @app.get("/api/status")
 def status():
@@ -127,7 +129,10 @@ async def root():
             "health": "/api/health",
             "chat_stream": "/api/chat/stream",
             "documents_upload": "/documents/upload",
+            "users_create": "/api/users/create",
+            "user_by_username": "/api/users/{username}",
             "chats": "/api/chats/{user_id}",
+            "chats_create": "/api/chats/create",
             "chat_detail": "/api/chats/detail/{chat_id}"
         }
     }
@@ -135,12 +140,12 @@ async def root():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("🚀", APP_NAME)
-    print(f"📊 Embeddings: LangChain ({PROVIDER})")
-    print("🧠 Memory: Mem0 with MemoryStub fallback")
-    print("💾 Vector Store: ChromaDB")
-    print(f"🗄️  Database: {DATABASE_PATH}")
-    print(f"🔧 OCR Support: Enabled (Tesseract)")
-    print(f"📄 JSON Processing: Enabled")
+    print(APP_NAME)
+    print(f"Embeddings: LangChain ({PROVIDER})")
+    print("Memory: Mem0 with MemoryStub fallback")
+    print("Vector Store: ChromaDB")
+    print(f"Database: {DATABASE_PATH}")
+    print("OCR Support: Enabled (Tesseract)")
+    print("JSON Processing: Enabled")
     print("=" * 60)
     uvicorn.run(app, host="127.0.0.1", port=8000)
