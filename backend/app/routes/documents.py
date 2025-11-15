@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
+from sqlmodel import select
 from app.config import UPLOAD_DIR, MAX_UPLOAD_SIZE, logger
 from app.utils import extract_text_from_file
 from app.schemas import UploadResponse
@@ -87,7 +88,7 @@ async def upload_document(
             logger.info(f"Chat '{chatId}' not found, creating automatically")
             
             # Verify user exists first
-            user = session.query(User).filter(User.username == userId).first()
+            user = session.exec(select(User).where(User.username == userId)).first()
             if not user:
                 # Create user if needed
                 user = User(id=userId, username=userId)

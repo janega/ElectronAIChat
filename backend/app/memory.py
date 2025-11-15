@@ -180,7 +180,7 @@ class Mem0MemoryManager:
             logger.info(f"mem0 search returned {len(result) if result else 0} results: {result}")
             return result
         except Exception:
-            logger.exception("❌ Memory search failed")
+            logger.exception("Memory search failed")
             return []
 
     def get_all(self, user_id: str):
