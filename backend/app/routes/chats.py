@@ -6,7 +6,7 @@ Handles chat thread creation, retrieval, updates, and deletion.
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select, col
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import Chat, ChatCreate, ChatResponse, ChatDetailResponse
 from app.routes.dependencies import DBSession
@@ -120,7 +120,7 @@ async def update_chat(chat_id: str, title: Optional[str] = None, search_mode: Op
         if not updated_fields:
             raise HTTPException(status_code=422, detail="No fields provided for update")
         
-        chat.updated_at = datetime.utcnow()
+        chat.updated_at = datetime.now(timezone.utc)
         session.add(chat)
         session.commit()
         
