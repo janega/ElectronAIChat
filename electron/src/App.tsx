@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Menu, X, Settings, Plus, Sun, Moon, Wifi, WifiOff } from 'lucide-react';
-import { PageType, Document } from './types';
+import { PageType, DocumentWithStatus } from './types';
 import { useTheme, useSettings, useChatHistory, useChat } from './hooks';
 import { apiClient } from './utils/api';
 import { SyncProvider, useSyncContext } from './contexts/SyncContext';
@@ -45,7 +45,7 @@ function AppContent() {
 
   const [currentPage, setCurrentPage] = useState<PageType>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [uploadedDocs, setUploadedDocs] = useState<Document[]>([]);
+  const [uploadedDocs, setUploadedDocs] = useState<DocumentWithStatus[]>([]);
   const [searchMode, setSearchMode] = useState('normal');
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [backendConnected, setBackendConnected] = useState(false);
@@ -183,25 +183,78 @@ function AppContent() {
   const handleUploadDocument = async (files: FileList | null) => {
     if (!currentChatId || !files || !username) return;
 
-    try {
-      for (const file of Array.from(files)) {
+    for (const file of Array.from(files)) {
+      // Create temporary document with processing status
+      const tempDoc: DocumentWithStatus = {
+        id: `temp-${Date.now()}-${Math.random()}`,
+        name: file.name,
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+        contentType: file.type,
+        status: 'uploading',
+        progress: 0,
+      };
+
+      setUploadedDocs((prev) => [...prev, tempDoc]);
+
+      try {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('chatId', currentChatId);
         formData.append('userId', username);
 
-        const result = await apiClient.uploadDocument(formData);
-        setUploadedDocs((prev) => [...prev, result.document]);
+        const result = await apiClient.uploadDocumentWithProgress(
+          formData,
+          (progressEvent) => {
+            // Update document status in real-time as progress events arrive
+            setUploadedDocs((prev) =>
+              prev.map((doc) =>
+                doc.id === tempDoc.id
+                  ? {
+                      ...doc,
+                      status: progressEvent.stage,
+                      progress: progressEvent.progress,
+                      currentChunk: progressEvent.current_chunk,
+                      totalChunks: progressEvent.total_chunks,
+                    }
+                  : doc
+              )
+            );
+          }
+        );
+
+        // Replace temp document with final result
+        setUploadedDocs((prev) =>
+          prev.map((doc) =>
+            doc.id === tempDoc.id
+              ? { ...result, status: 'ready', progress: 100 }
+              : doc
+          )
+        );
+
+        // Update chat history with completed document
         updateChat(currentChatId, {
-          documents: [...uploadedDocs, result.document],
+          documents: uploadedDocs
+            .filter((d) => d.id !== tempDoc.id)
+            .concat({ ...result, status: 'ready', progress: 100 })
+            .map(({ status, progress, currentChunk, totalChunks, error, ...doc }) => doc), // Strip status fields for storage
         });
+      } catch (error) {
+        // Mark document as failed
+        setUploadedDocs((prev) =>
+          prev.map((doc) =>
+            doc.id === tempDoc.id
+              ? {
+                  ...doc,
+                  status: 'error',
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                }
+              : doc
+          )
+        );
+
+        console.error('Upload failed:', error);
       }
-    } catch (error) {
-      alert(
-        `Upload failed: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
-      );
     }
   };
 
