@@ -54,7 +54,7 @@ function createWindow() {
   // Load your frontend
   // mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
   if (app.isPackaged) {
-  mainWindow.loadFile(path.join(__dirname, "dist/react/index.html"));
+  mainWindow.loadFile(path.join(__dirname, "react/index.html"));
 } else {
   mainWindow.loadURL("http://localhost:5173");
 }
@@ -141,7 +141,7 @@ app.whenReady().then(async () => {
   startBackend();
 
   try {
-    await waitForHealth("http://127.0.0.1:8000/api/health", 50000);
+    await waitForHealth("http://127.0.0.1:8000/api/health", 100000);
     console.log("✅ Backend is ready, launching window...");
     createWindow();
   } catch (err) {

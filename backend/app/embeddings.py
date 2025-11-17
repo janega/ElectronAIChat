@@ -111,6 +111,7 @@ class LangChainEmbeddingManager:
         if Chroma is None:
             raise RuntimeError("Chroma vectorstore is not available. Install langchain-community or chromadb.")
         persist_directory = str(Path(CHROMA_DIR) / chat_id)
+        logger.info(f"Creating ChromaDB vectorstore at: {persist_directory}")
         # `collection_name` and `persist_directory` are common args; versions differ — this matches many langchain-chroma variants.
         try:
             vectorstore = Chroma(

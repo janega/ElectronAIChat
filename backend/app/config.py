@@ -40,8 +40,11 @@ def get_app_data_dir():
     return app_dir
 
 
-# Use app data directory if not in development mode
-USE_APP_DATA_DIR = os.getenv("USE_APP_DATA_DIR", "false").lower() == "true"
+# Detect if running as packaged executable
+IS_PACKAGED = getattr(sys, 'frozen', False)
+
+# Force app data directory when packaged, otherwise check env var
+USE_APP_DATA_DIR = IS_PACKAGED or os.getenv("USE_APP_DATA_DIR", "false").lower() == "true"
 
 if USE_APP_DATA_DIR:
     BASE_DIR = get_app_data_dir()

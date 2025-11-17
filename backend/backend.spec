@@ -6,7 +6,8 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-  # ('.'),  # Include .env file if you have one
+        # Include only code directories, NOT data directories
+        # chroma_db, uploads, and chat_history.db will be created in AppData
         ('app', 'app'),  # Include the app directory
         ('utils', 'utils')  # Include the utils directory
     ],
