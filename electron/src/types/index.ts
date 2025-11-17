@@ -12,6 +12,26 @@ export interface Document {
   size: number;
   uploadedAt: string;
   contentType: string;
+  chunks?: number;
+}
+
+export type DocumentStatus = 'uploading' | 'uploaded' | 'extracting' | 'extracted' | 'chunking' | 'chunking_complete' | 'embedding' | 'ready' | 'error';
+
+export interface DocumentWithStatus extends Document {
+  status: DocumentStatus;
+  progress?: number; // 0-100
+  currentChunk?: number;
+  totalChunks?: number;
+  error?: string;
+}
+
+export interface UploadProgressEvent {
+  stage: DocumentStatus;
+  progress: number;
+  currentChunk?: number;
+  totalChunks?: number;
+  document?: Document;
+  error?: string;
 }
 
 export interface Chat {

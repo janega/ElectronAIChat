@@ -1,9 +1,9 @@
 import React from 'react';
-import { Upload, Maximize2, Minimize2 } from 'lucide-react';
-import { Document } from '../types';
+import { Upload, Maximize2, Minimize2, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { DocumentWithStatus } from '../types';
 
 interface ChatControlsProps {
-  uploadedDocs: Document[];
+  uploadedDocs: DocumentWithStatus[];
   searchMode: string;
   onSearchModeChange: (mode: string) => void;
   onUpload: (files: FileList) => void;
@@ -37,18 +37,35 @@ export function ChatControls({
       </label>
 
       {uploadedDocs.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-gray-600 dark:text-gray-400">
             {uploadedDocs.length} doc(s)
           </span>
-          {uploadedDocs.map((doc) => (
-            <span
-              key={doc.id}
-              className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 text-xs rounded"
-            >
-              {doc.name}
-            </span>
-          ))}
+          {uploadedDocs.map((doc) => {
+            const isProcessing = doc.status && doc.status !== 'ready' && doc.status !== 'error';
+            const isError = doc.status === 'error';
+            const isReady = doc.status === 'ready';
+            
+            return (
+              <div
+                key={doc.id}
+                className="flex items-center gap-1.5 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 text-xs rounded"
+                title={isError ? doc.error : doc.status}
+              >
+                <span className="truncate max-w-[120px]">{doc.name}</span>
+                {isProcessing && (
+                  <>
+                    <Loader size={12} className="animate-spin text-blue-600 dark:text-blue-300" />
+                    {doc.progress !== undefined && (
+                      <span className="text-[10px]">{Math.round(doc.progress)}%</span>
+                    )}
+                  </>
+                )}
+                {isReady && <CheckCircle size={12} className="text-green-600 dark:text-green-400" />}
+                {isError && <XCircle size={12} className="text-red-600 dark:text-red-400" />}
+              </div>
+            );
+          })}
         </div>
       )}
 

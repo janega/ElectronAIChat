@@ -123,6 +123,63 @@ export class ApiClient {
     return response.json();
   }
 
+  async uploadDocumentWithProgress(
+    formData: FormData,
+    onProgress: (event: any) => void
+  ): Promise<Document> {
+    const url = `${this.baseUrl}/documents/upload/stream`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+
+    const decoder = new TextDecoder();
+    let finalDocument: Document | null = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              onProgress(data);
+              
+              if (data.stage === 'ready' && data.document) {
+                finalDocument = data.document;
+              }
+            } catch (e) {
+              console.warn('Failed to parse SSE chunk:', line);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    if (!finalDocument) {
+      throw new Error('Upload completed but no document returned');
+    }
+
+    return finalDocument;
+  }
+
   async checkStatus(): Promise<{ status: string }> {
     const url = `${this.baseUrl}/api/status`;
     const response = await fetch(url, {
