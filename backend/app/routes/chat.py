@@ -5,12 +5,12 @@ Handles real-time chat with RAG context and memory integration.
 """
 import json
 import asyncio
+from datetime import datetime, timezone
 from fastapi import APIRouter, Body, Depends
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
 from app.config import logger
 from .dependencies import get_langchain_manager, get_mem0_manager, get_openai_client, DBSession
 
@@ -81,8 +81,8 @@ async def chat_stream(
                     session.commit()
                     logger.info(f"Created chat: {payload.chatId}")
                 else:
-                    # Update existing chat timestamp
-                    chat.updated_at = datetime.utcnow()
+                    # Update existing chat timestamp                    
+                    chat.update_at =  datetime.now(timezone.utc)
                     session.add(chat)
                 
                 # Save user message

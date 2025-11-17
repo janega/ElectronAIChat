@@ -39,6 +39,7 @@ function AppContent() {
     isSyncing,
     isInitialSyncComplete,
     unsyncedCount,
+    generateTitleIfNeeded,
   } = useChatHistory(username || undefined);
   const { messages, setMessages, isLoading, sendMessage, cleanup } =
     useChat();
@@ -85,6 +86,42 @@ function AppContent() {
 
     initialize();
   }, []); // Only run once on mount
+
+  // Backfill titles for existing chats with 2-3 messages (one-time check after sync)
+  useEffect(() => {
+    if (isInitialSyncComplete && chats.length > 0) {
+      console.log('[Title Backfill] Checking existing chats for title generation...', {
+        totalChats: chats.length,
+        username
+      });
+      
+      const chatsNeedingTitles = chats.filter(
+        chat => chat.isSynced && 
+                chat.title === 'New Chat' && 
+                chat.messages.length >= 2
+      );
+      
+      console.log('[Title Backfill] Chats needing titles:', chatsNeedingTitles.map(c => ({
+        id: c.id,
+        serverChatId: c.serverChatId,
+        messageCount: c.messages.length,
+        title: c.title
+      })));
+      
+      if (chatsNeedingTitles.length > 0) {
+        console.log(`[Title Backfill] ✅ Found ${chatsNeedingTitles.length} chats needing titles`);
+        // Stagger the requests to avoid overwhelming the backend
+        chatsNeedingTitles.forEach((chat, index) => {
+          setTimeout(() => {
+            console.log(`[Title Backfill] 🚀 Generating title for chat ${index + 1}/${chatsNeedingTitles.length}:`, chat.serverChatId || chat.id);
+            generateTitleIfNeeded(chat.id);
+          }, index * 2000); // 2 second delay between each
+        });
+      } else {
+        console.log('[Title Backfill] No chats need titles');
+      }
+    }
+  }, [isInitialSyncComplete, chats, generateTitleIfNeeded, username]); // Include all dependencies
 
   // Handle username submission from modal
   const handleUsernameSet = async (newUsername: string) => {
@@ -135,7 +172,7 @@ function AppContent() {
     if (currentChat) {
       isLoadingChatRef.current = true;
       setMessages(currentChat.messages);
-      setUploadedDocs(currentChat.documents);
+      setUploadedDocs(currentChat.documents.map(doc => ({ ...doc, status: 'ready' as const, progress: 100 })));
       setSearchMode(currentChat.searchMode);
       // Reset the flag after a brief delay to allow state updates to settle
       setTimeout(() => {
@@ -149,15 +186,72 @@ function AppContent() {
     return () => cleanup();
   }, [cleanup]);
 
-  // Sync messages to chat history whenever they change (but not during chat loading)
+  // Sync messages and searchMode to localStorage only (debounced)
   useEffect(() => {
     if (!isLoadingChatRef.current && currentChatId && messages.length > 0) {
-      updateChat(currentChatId, {
-        messages,
-        searchMode: searchMode as any,
-      });
+      // Debounce: only sync after activity stops (streaming, typing, etc.)
+      const timer = setTimeout(() => {
+        updateChat(currentChatId, {
+          messages,
+          searchMode: searchMode as any, // Just UI state, stored locally
+        });
+      }, 1000); // Wait 1 second of inactivity
+      
+      return () => clearTimeout(timer);
     }
   }, [messages, currentChatId, searchMode]);
+
+  // Trigger title generation after 2 messages (optimal context window)
+  useEffect(() => {
+    const shouldTrigger = !isLoadingChatRef.current && 
+                          currentChatId && 
+                          messages.length === 2; // Only trigger once at 2 messages
+    
+    console.log('[App] Title generation check:', {
+      shouldTrigger,
+      isLoading: isLoadingChatRef.current,
+      currentChatId,
+      messageCount: messages.length,
+      isSynced: currentChat?.isSynced,
+      serverChatId: currentChat?.serverChatId,
+      title: currentChat?.title
+    });
+    
+    if (shouldTrigger) {
+      console.log('[App] ✅ Scheduling title generation...');
+      const timer = setTimeout(() => {
+        console.log('[App] 🚀 Calling generateTitleIfNeeded for:', currentChatId);
+        generateTitleIfNeeded(currentChatId);
+      }, 1500); // Increased delay to ensure chat is synced
+      
+      return () => clearTimeout(timer);
+    }
+  }, [messages.length, currentChatId, generateTitleIfNeeded]);
+
+  // Also trigger when chat becomes synced (handles race condition)
+  useEffect(() => {
+    const shouldTriggerOnSync = currentChat?.isSynced && 
+                                currentChat.title === 'New Chat' && 
+                                currentChat.messages.length >= 2;
+    
+    console.log('[App] Sync-based title generation check:', {
+      shouldTriggerOnSync,
+      isSynced: currentChat?.isSynced,
+      serverChatId: currentChat?.serverChatId,
+      title: currentChat?.title,
+      messageCount: currentChat?.messages.length
+    });
+    
+    if (shouldTriggerOnSync) {
+      console.log('[App] ✅ Chat just synced, triggering title generation...');
+      const timer = setTimeout(() => {
+        console.log('[App] 🚀 Calling generateTitleIfNeeded (sync-triggered) for:', currentChat.id);
+        generateTitleIfNeeded(currentChat.id);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentChat?.isSynced, currentChat?.id, currentChat?.messages.length, currentChat?.title, generateTitleIfNeeded]);
 
   // Scroll to bottom
   useEffect(() => {

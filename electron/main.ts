@@ -138,7 +138,7 @@ app.whenReady().then(async () => {
     console.log('Theme changed to:', theme);
   });
 
-  startBackend();
+  // startBackend();
 
   try {
     await waitForHealth("http://127.0.0.1:8000/api/health", 100000);

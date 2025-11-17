@@ -177,9 +177,16 @@ export function useChatHistory(username?: string) {
     if (chat?.isSynced && chat.serverChatId) {
       try {
         const backendUpdates: any = {};
-        if (updates.title !== undefined) backendUpdates.title = updates.title;
-        if (updates.searchMode !== undefined) backendUpdates.search_mode = updates.searchMode;
         
+        // Only include fields that actually changed
+        if (updates.title !== undefined && updates.title !== chat.title) {
+          backendUpdates.title = updates.title;
+        }
+        if (updates.searchMode !== undefined && updates.searchMode !== chat.searchMode) {
+          backendUpdates.search_mode = updates.searchMode;
+        }
+        
+        // Only make API call if something actually changed
         if (Object.keys(backendUpdates).length > 0) {
           await apiClient.updateChat(chat.serverChatId, backendUpdates);
         }
@@ -218,6 +225,89 @@ export function useChatHistory(username?: string) {
   // Calculate unsynced count
   const unsyncedCount = chats.filter((chat) => !chat.isSynced).length;
 
+  const generateTitleIfNeeded = useCallback(async (chatId: string) => {
+    // CRITICAL: Check username at execution time
+    if (!username) {
+      console.log('[Title Gen] Skip: No username available');
+      return;
+    }
+
+    // Use functional setState to get latest chats without stale closure
+    let chat: Chat | undefined;
+    setChats((prev) => {
+      chat = prev.find((c) => c.id === chatId);
+      return prev; // No change, just reading
+    });
+    
+    console.log('[Title Gen] Checking chat:', chatId, {
+      exists: !!chat,
+      isSynced: chat?.isSynced,
+      title: chat?.title,
+      messageCount: chat?.messages.length,
+      serverChatId: chat?.serverChatId
+    });
+    
+    // Only generate if:
+    // 1. Chat exists and is synced
+    // 2. Still has default title
+    // 3. Has at least 2 messages (enough context for title)
+    if (!chat?.isSynced || !chat.serverChatId) {
+      console.log('[Title Gen] Skip: Not synced or no serverChatId');
+      return;
+    }
+    if (chat.title !== 'New Chat') {
+      console.log('[Title Gen] Skip: Title already set:', chat.title);
+      return;
+    }
+    if (chat.messages.length < 2) {
+      console.log('[Title Gen] Skip: Not enough messages (need 2+):', chat.messages.length);
+      return;
+    }
+    
+    console.log('[Title Gen] ✅ Triggering title generation for chat:', chat.serverChatId);
+    
+    try {
+      const result = await apiClient.generateChatTitle(chat.serverChatId);
+      console.log('[Title Gen] Backend response:', result);
+      
+      if (result.success && result.status === 'generating') {
+        // Title is being generated in background
+        // Poll for updated title after a short delay
+        setTimeout(async () => {
+          try {
+            console.log('[Title Gen] Polling for updated title...');
+            const backendChats = await apiClient.getUserChats(username);
+            const updatedChat = backendChats.find((c: any) => c.id === chat!.serverChatId);
+            
+            console.log('[Title Gen] Found updated chat:', updatedChat?.title);
+            
+            if (updatedChat && updatedChat.title !== 'New Chat') {
+              // Update local state with new title - force new object reference for React re-render
+              setChats((prev) => {
+                const updated = prev.map((c) =>
+                  c.id === chatId
+                    ? { ...c, title: updatedChat.title, updatedAt: new Date().toISOString() }
+                    : c
+                );
+                // Force localStorage sync
+                localStorage.setItem('chats', JSON.stringify(updated));
+                return updated;
+              });
+              console.log('[Title Gen] ✅ Title updated to:', updatedChat.title);
+            } else {
+              console.log('[Title Gen] ⚠️ Title still "New Chat" - generation may have failed');
+            }
+          } catch (error) {
+            console.error('[Title Gen] Failed to fetch updated title:', error);
+          }
+        }, 3000); // Wait 3 seconds for background task to complete
+      }
+    } catch (error) {
+      console.error('[Title Gen] Failed to generate chat title:', error);
+      // Fail silently - not critical
+    }
+  }, [username]);
+
   return {
     chats,
     currentChatId,
@@ -231,5 +321,6 @@ export function useChatHistory(username?: string) {
     isSyncing,
     isInitialSyncComplete,
     unsyncedCount,
+    generateTitleIfNeeded,
   };
 }

@@ -295,6 +295,23 @@ export class ApiClient {
 
     return response.json();
   }
+
+  async generateChatTitle(chatId: string): Promise<{ success: boolean; title?: string; status?: string }> {
+    const url = `${this.baseUrl}/api/chats/${chatId}/generate-title`;
+    try {
+      const response = await fetch(url, { method: 'POST' });
+
+      if (!response.ok) {
+        console.warn('Title generation failed:', response.status);
+        return { success: false };
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Title generation request failed:', error);
+      return { success: false };
+    }
+  }
 }
 
 export const apiClient = new ApiClient();

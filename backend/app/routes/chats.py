@@ -3,16 +3,119 @@
 Chat management endpoints for frontend localStorage sync.
 Handles chat thread creation, retrieval, updates, and deletion.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from sqlmodel import select, col
 from typing import List, Optional
 from datetime import datetime, timezone
 
 from app.database import Chat, ChatCreate, ChatResponse, ChatDetailResponse
-from app.routes.dependencies import DBSession
+from app.routes.dependencies import DBSession, OpenAIClient, get_session
 from app.config import logger
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
+
+
+async def generate_title_background(chat_id: str, openai_client: OpenAIClient):
+    """Background task to generate chat title based on conversation history."""
+    session = None
+    try:
+        session = next(get_session())
+        chat = session.get(Chat, chat_id)
+        
+        if not chat or len(chat.messages) < 2:
+            logger.debug(f"Skip title generation for chat {chat_id}: insufficient messages")
+            return
+        
+        # Only generate if still using default title
+        if chat.title != "New Chat":
+            logger.debug(f"Skip title generation for chat {chat_id}: title already set")
+            return
+        
+        # Build conversation context (limit to first 4 messages for speed)
+        messages_for_context = chat.messages[:4]
+        conversation = "\n".join([
+            f"{msg.role}: {msg.content[:200]}"  # Truncate long messages
+            for msg in messages_for_context
+        ])
+        
+        # Strict prompt for title generation
+        title_prompt = f"""Based on this conversation, generate a concise title (max 6 words, no quotes):
+
+{conversation}
+
+Title:"""
+        
+        # Generate title with minimal tokens
+        title_messages = [{"role": "user", "content": title_prompt}]
+        full_title = ""
+        
+        async for chunk in openai_client.create_chat_completion(
+            model="llama2",  # Use fast model
+            messages=title_messages,
+            temperature=0.3,  # Low temperature for consistency
+            max_tokens=20,    # Short title only
+            stream=True
+        ):
+            if chunk.get("token"):
+                full_title += chunk["token"]
+            if chunk.get("done"):
+                break
+        
+        # Clean and validate title
+        title = full_title.strip().replace('"', '').replace("'", "")[:50]
+        if not title or len(title) < 3:
+            title = "Conversation"
+        
+        # Update database
+        chat.title = title
+        chat.updated_at = datetime.now(timezone.utc)
+        session.add(chat)
+        session.commit()
+        
+        logger.info(f"Generated title for chat {chat_id}: {title}")
+        
+    except Exception as e:
+        logger.exception(f"Title generation failed for chat {chat_id}")
+        if session:
+            session.rollback()
+    finally:
+        if session:
+            session.close()
+
+
+@router.post("/{chat_id}/generate-title")
+async def generate_chat_title(
+    chat_id: str,
+    background_tasks: BackgroundTasks,
+    openai_client: OpenAIClient,
+    session: DBSession
+):
+    """
+    Trigger background title generation for a chat.
+    Called automatically after 2-3 messages for meaningful context.
+    """
+    try:
+        chat = session.get(Chat, chat_id)
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        
+        # Quick validation checks
+        if chat.title != "New Chat":
+            return {"success": False, "reason": "Title already set"}
+        
+        if len(chat.messages) < 2:
+            return {"success": False, "reason": "Insufficient messages"}
+        
+        # Add background task - non-blocking
+        background_tasks.add_task(generate_title_background, chat_id, openai_client)
+        
+        return {"success": True, "status": "generating", "chat_id": chat_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to trigger title generation")
+        return {"success": False, "error": str(e)}
 
 
 @router.post("/create", response_model=ChatResponse)

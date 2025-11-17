@@ -62,15 +62,15 @@ def get_db_stats(session: Session) -> dict:
         Dictionary with table counts
     """
     from app.database import User, Chat, Message, Document, UserSettings
-    from sqlmodel import select
+    from sqlmodel import select, func
     
     try:
         stats = {
-            "users": session.exec(select(User)).count(),
-            "chats": session.exec(select(Chat)).count(),
-            "messages": session.exec(select(Message)).count(),
-            "documents": session.exec(select(Document)).count(),
-            "settings": session.exec(select(UserSettings)).count(),
+            "users": session.exec(select(func.count()).select_from(User)).one(),
+            "chats": session.exec(select(func.count()).select_from(Chat)).one(),
+            "messages": session.exec(select(func.count()).select_from(Message)).one(),
+            "documents": session.exec(select(func.count()).select_from(Document)).one(),
+            "settings": session.exec(select(func.count()).select_from(UserSettings)).one(),
         }
         return stats
     except Exception as e:
