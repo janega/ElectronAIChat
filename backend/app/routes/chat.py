@@ -82,7 +82,7 @@ async def chat_stream(
                     logger.info(f"Created chat: {payload.chatId}")
                 else:
                     # Update existing chat timestamp                    
-                    chat.update_at =  datetime.now(timezone.utc)
+                    chat.updated_at = datetime.now(timezone.utc)
                     session.add(chat)
                 
                 # Save user message

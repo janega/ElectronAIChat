@@ -6,6 +6,9 @@ export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
+  
+  // Track active streams per chat to support concurrent requests
+  const activeStreamsRef = useRef<Map<string, () => void>>(new Map());
 
   const sendMessage = useCallback(
     async (
@@ -52,7 +55,7 @@ export function useChat() {
           cleanupRef.current();
         }
 
-        cleanupRef.current = apiClient.streamResponse(
+        const streamCleanup = apiClient.streamResponse(
           '/api/chat/stream',
           payload,
           (chunk) => {
@@ -89,6 +92,7 @@ export function useChat() {
                 role: 'assistant',
                 content: `Error: ${error.message}`,
                 timestamp: new Date().toISOString(),
+                error: error.message,
               };
               setMessages((prev) => [...prev, errorMessage]);
             } else {
@@ -96,30 +100,37 @@ export function useChat() {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === aiMessageId
-                    ? { ...m, content: `Error: ${error.message}` }
+                    ? { ...m, content: `Error: ${error.message}`, error: error.message }
                     : m
                 )
               );
             }
             setIsLoading(false);
+            activeStreamsRef.current.delete(chatId);
           },
           () => {
             // Stream completed successfully
             setIsLoading(false);
+            activeStreamsRef.current.delete(chatId);
           }
         );
+        
+        // Store cleanup function for this chat's stream
+        cleanupRef.current = streamCleanup;
+        activeStreamsRef.current.set(chatId, streamCleanup);
       } catch (error) {
         console.error('Failed to send message:', error);
+        
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         
         // Add error message if stream never started
         if (!aiMessageAdded) {
           const errorMessage: Message = {
             id: aiMessageId,
             role: 'assistant',
-            content: `Error: ${
-              error instanceof Error ? error.message : 'Unknown error'
-            }`,
+            content: `Error: ${errorMsg}`,
             timestamp: new Date().toISOString(),
+            error: errorMsg,
           };
           setMessages((prev) => [...prev, errorMessage]);
         } else {
@@ -129,9 +140,8 @@ export function useChat() {
               m.id === aiMessageId
                 ? {
                     ...m,
-                    content: `Error: ${
-                      error instanceof Error ? error.message : 'Unknown error'
-                    }`,
+                    content: `Error: ${errorMsg}`,
+                    error: errorMsg,
                   }
                 : m
             )
@@ -149,12 +159,23 @@ export function useChat() {
     }
   }, []);
 
+  const stopStream = useCallback((chatId: string) => {
+    console.log('[useChat] Stopping stream for chat:', chatId);
+    const cleanupFn = activeStreamsRef.current.get(chatId);
+    if (cleanupFn) {
+      cleanupFn();
+      activeStreamsRef.current.delete(chatId);
+      setIsLoading(false);
+    }
+  }, []);
+
   return {
     messages,
     setMessages,
     isLoading,
     setIsLoading,
     sendMessage,
+    stopStream,
     cleanup,
   };
 }

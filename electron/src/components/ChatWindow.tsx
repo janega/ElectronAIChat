@@ -7,6 +7,7 @@ interface ChatWindowProps {
   isLoading: boolean;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   isDark: boolean;
+  onRetryMessage?: (message: Message) => void;
 }
 
 export function ChatWindow({
@@ -14,6 +15,7 @@ export function ChatWindow({
   isLoading,
   messagesEndRef,
   isDark,
+  onRetryMessage,
 }: ChatWindowProps) {
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white dark:bg-gray-950">
@@ -30,6 +32,7 @@ export function ChatWindow({
               key={message.id}
               message={message}
               isDark={isDark}
+              onRetry={onRetryMessage}
             />
           ))}
           {isLoading && (

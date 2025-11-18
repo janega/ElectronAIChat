@@ -1,13 +1,14 @@
 import React, { useState, useRef } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Square } from 'lucide-react';
 
 interface MessageInputProps {
   onSend: (message: string) => void;
+  onStop?: () => void;
   isLoading: boolean;
   isExpanded?: boolean;
 }
 
-export function MessageInput({ onSend, isLoading, isExpanded = false }: MessageInputProps) {
+export function MessageInput({ onSend, onStop, isLoading, isExpanded = false }: MessageInputProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -40,13 +41,23 @@ export function MessageInput({ onSend, isLoading, isExpanded = false }: MessageI
           className={`flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none ${isExpanded ? 'overflow-y-auto' : ''}`}
           style={isExpanded ? { minHeight: '200px', maxHeight: '100%' } : {}}
         />
-        <button
-          onClick={handleSubmit}
-          disabled={isLoading || !input.trim()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 self-end"
-        >
-          <Send size={18} />
-        </button>
+        {isLoading && onStop ? (
+          <button
+            onClick={onStop}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2 self-end"
+            title="Stop generation"
+          >
+            <Square size={18} />
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={isLoading || !input.trim()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 self-end"
+          >
+            <Send size={18} />
+          </button>
+        )}
       </div>
     </div>
   );

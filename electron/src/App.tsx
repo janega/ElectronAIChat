@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Menu, X, Settings, Plus, Sun, Moon, Wifi, WifiOff } from 'lucide-react';
-import { PageType, DocumentWithStatus } from './types';
+import { PageType, DocumentWithStatus, Message } from './types';
 import { useTheme, useSettings, useChatHistory, useChat } from './hooks';
 import { apiClient } from './utils/api';
 import { SyncProvider, useSyncContext } from './contexts/SyncContext';
@@ -41,7 +41,7 @@ function AppContent() {
     unsyncedCount,
     generateTitleIfNeeded,
   } = useChatHistory(username || undefined);
-  const { messages, setMessages, isLoading, sendMessage, cleanup } =
+  const { messages, setMessages, isLoading, sendMessage, stopStream, cleanup } =
     useChat();
 
   const [currentPage, setCurrentPage] = useState<PageType>('chat');
@@ -261,17 +261,85 @@ function AppContent() {
   const handleSendMessage = async (content: string) => {
     if (!currentChatId || !username) return;
 
-    await sendMessage(
-      content,
-      currentChatId,
-      username,
-      searchMode,
-      uploadedDocs.map((d) => d.id),
-      settings
-    );
+    // Mark chat as streaming
+    updateChat(currentChatId, { isStreaming: true });
+
+    // Use serverChatId for backend API calls, fallback to local ID
+    const backendChatId = currentChat?.serverChatId || currentChatId;
+    
+    console.log('[Send Message] Using chat ID:', {
+      localId: currentChatId,
+      serverChatId: currentChat?.serverChatId,
+      backendChatId,
+      isSynced: currentChat?.isSynced
+    });
+
+    try {
+      await sendMessage(
+        content,
+        backendChatId,
+        username,
+        searchMode,
+        uploadedDocs.map((d) => d.id),
+        settings
+      );
+    } finally {
+      // Mark chat as no longer streaming
+      updateChat(currentChatId, { isStreaming: false });
+    }
 
     // Note: messages state will be updated by useChat hook
     // We'll sync to chat history in a separate effect
+  };
+
+  const handleSelectChat = (chatId: string) => {
+    // Check if current chat is streaming
+    const streamingChat = chats.find(c => c.isStreaming);
+    
+    if (streamingChat && streamingChat.id !== chatId) {
+      console.log('[Chat Switch] Warning: Switching away from streaming chat:', streamingChat.id);
+      // In the future, we could show a confirmation dialog here
+      // For now, we allow switching but log a warning
+    }
+    
+    setCurrentChatId(chatId);
+  };
+
+  const handleRetryMessage = async (userMessage: Message) => {
+    if (!currentChatId || !username || userMessage.role !== 'user') return;
+
+    // Mark message as retrying
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === userMessage.id ? { ...m, isRetrying: true } : m
+      )
+    );
+
+    // Remove any AI response that came after this message (if it failed)
+    const messageIndex = messages.findIndex((m) => m.id === userMessage.id);
+    if (messageIndex !== -1 && messageIndex < messages.length - 1) {
+      const nextMessage = messages[messageIndex + 1];
+      if (nextMessage.role === 'assistant') {
+        setMessages((prev) => prev.filter((m) => m.id !== nextMessage.id));
+      }
+    }
+
+    // Unmark as retrying and resend
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === userMessage.id ? { ...m, isRetrying: false } : m
+      )
+    );
+    
+    await handleSendMessage(userMessage.content);
+  };
+
+  const handleStopStream = () => {
+    if (currentChatId) {
+      console.log('[App] Stopping stream for chat:', currentChatId);
+      stopStream(currentChatId);
+      updateChat(currentChatId, { isStreaming: false });
+    }
   };
 
   const handleUploadDocument = async (files: FileList | null) => {
@@ -360,7 +428,7 @@ function AppContent() {
             isOpen={sidebarOpen}
             chats={chats}
             currentChatId={currentChatId}
-            onSelectChat={setCurrentChatId}
+            onSelectChat={handleSelectChat}
             onNewChat={createNewChat}
             onDeleteChat={deleteChat}
             isDark={isDark}
@@ -419,7 +487,7 @@ function AppContent() {
           isOpen={sidebarOpen}
           chats={chats}
           currentChatId={currentChatId}
-          onSelectChat={setCurrentChatId}
+          onSelectChat={handleSelectChat}
           onNewChat={createNewChat}
           onDeleteChat={deleteChat}
           isDark={isDark}
@@ -470,6 +538,7 @@ function AppContent() {
                 isLoading={isLoading}
                 messagesEndRef={messagesEndRef}
                 isDark={isDark}
+                onRetryMessage={handleRetryMessage}
               />
 
               <ChatControls
@@ -487,6 +556,7 @@ function AppContent() {
 
               <MessageInput
                 onSend={handleSendMessage}
+                onStop={handleStopStream}
                 isLoading={isLoading}
                 isExpanded={isInputExpanded}
               />

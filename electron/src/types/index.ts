@@ -4,6 +4,8 @@ export interface Message {
   content: string;
   searchMode?: 'normal' | 'embeddings' | 'all';
   timestamp: string;
+  error?: string;           // Error message if generation failed
+  isRetrying?: boolean;     // True when retry is in progress
 }
 
 export interface Document {
@@ -46,6 +48,7 @@ export interface Chat {
   serverChatId?: string;     // real ID from backend (when isSynced becomes true)
   draftMessage?: string;     // unsent message text preserved across refreshes
   pendingMessages?: Message[]; // messages queued when backend unreachable
+  isStreaming?: boolean;     // true when this chat is receiving a streaming response
 }
 
 export interface AppSettings {
