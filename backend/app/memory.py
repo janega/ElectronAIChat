@@ -84,9 +84,11 @@ class Mem0MemoryManager:
                 "provider": "ollama",
                 "config": {
                     "model": DEFAULT_OLLAMA_LLM_MODEL,
-                    "temperature": 0.7,
+                    "temperature": 0.1,
                     "max_tokens": 2000,
-                    "ollama_base_url": OLLAMA_HOST,  # mem0 uses ollama_base_url, not base_url
+                    "ollama_base_url": OLLAMA_HOST,  # mem0 uses ollama_base_url, not base_url,
+                    "top_p": 0.8,  # Slightly more focused than 0.9
+                    "top_k": 40,
                 }
             }
             config["embedder"] = {
@@ -102,9 +104,11 @@ class Mem0MemoryManager:
                 "provider": "openai",
                 "config": {
                     "model": DEFAULT_OPENAI_LLM_MODEL,
-                    "temperature": 0.7,
+                    "temperature": 0.1,
                     "max_tokens": 2000,
                     "api_key": OPENAI_API_KEY,
+                    "top_p": 0.8,  # Slightly more focused than 0.9
+                    "top_k": 40,
                 }
             }
             config["embedder"] = {
