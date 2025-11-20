@@ -494,7 +494,7 @@ function AppContent() {
               {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            <h1 className="text-xl font-semibold">AI Chat</h1>
+            <h1 className="text-xl font-semibold">Welcome {username}</h1>
 
             <div className="flex items-center gap-2">
               <div className="relative group">
