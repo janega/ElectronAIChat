@@ -172,15 +172,6 @@ function AppContent() {
     return () => cleanup();
   }, [cleanup]);
 
-  // Sync searchMode to chat history when it changes
-  useEffect(() => {
-    if (currentChatId) {
-      updateChat(currentChatId, {
-        searchMode: searchMode as any,
-      });
-    }
-  }, [searchMode, currentChatId]);
-
   // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

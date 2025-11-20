@@ -27,6 +27,28 @@ export function MessageBubble({ message, isDark, onRetry }: MessageBubbleProps) 
           {message.content}
         </p>
         
+        {/* Document Sources Attribution */}
+        {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
+          <div className={`mt-2 pt-2 border-t ${isDark ? 'border-gray-700' : 'border-gray-300'}`}>
+            <p className="text-xs font-medium opacity-70 mb-1">Sources:</p>
+            <div className="flex flex-wrap gap-1">
+              {message.sources.map((source, idx) => (
+                <span
+                  key={idx}
+                  className={`text-xs px-2 py-0.5 rounded ${
+                    isDark 
+                      ? 'bg-gray-700 text-gray-300' 
+                      : 'bg-gray-300 text-gray-700'
+                  }`}
+                  title={`Document used for context: ${source.filename}`}
+                >
+                  {source.filename}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {message.role === 'user' && onRetry && (
           <div className="mt-2 pt-2 border-t border-blue-400 dark:border-blue-500 flex items-center gap-2">
             <button
@@ -38,6 +60,29 @@ export function MessageBubble({ message, isDark, onRetry }: MessageBubbleProps) 
               <RefreshCw size={12} className={message.isRetrying ? 'animate-spin' : ''} />
               {message.isRetrying ? 'Retrying...' : 'Retry'}
             </button>
+          </div>
+        )}
+        
+        {/* Metadata for assistant messages */}
+        {message.role === 'assistant' && (message.modelUsed || message.tokensUsed || message.responseTime) && (
+          <div className={`mt-2 pt-2 border-t ${isDark ? 'border-gray-700' : 'border-gray-300'}`}>
+            <div className="flex flex-wrap gap-2 text-xs opacity-70">
+              {message.modelUsed && (
+                <span title="Model used">
+                  🤖 {message.modelUsed}
+                </span>
+              )}
+              {message.tokensUsed && (
+                <span title="Tokens used">
+                  🔢 {message.tokensUsed} tokens
+                </span>
+              )}
+              {message.responseTime && (
+                <span title="Response time">
+                  ⏱️ {message.responseTime.toFixed(2)}s
+                </span>
+              )}
+            </div>
           </div>
         )}
         

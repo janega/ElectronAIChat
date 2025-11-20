@@ -103,6 +103,7 @@ async def chat_stream(
             
             # 1. Retrieve document context (RAG)
             doc_context = ""
+            sources = []  # Track document sources for RAG attribution
             if payload.searchMode in ["embeddings", "all"]:
                 try:
                     search_results = await langchain_manager.search_documents(
@@ -114,7 +115,15 @@ async def chat_stream(
                         doc_context = "\n\n--- Relevant Documents ---\n"
                         for result in search_results:
                             doc_context += f"\n{result['content']}\n"
-                            doc_context += f"(Source: {result['metadata'].get('filename', 'Unknown')})\n"
+                            filename = result['metadata'].get('filename', 'Unknown')
+                            doc_context += f"(Source: {filename})\n"
+                            
+                            # Track unique sources for attribution
+                            if filename not in [s['filename'] for s in sources]:
+                                sources.append({
+                                    'filename': filename,
+                                    'chatId': result['metadata'].get('chatId', payload.chatId)
+                                })
                 except Exception:
                     logger.exception("Document search failed - continuing without RAG context")
 
@@ -178,6 +187,11 @@ async def chat_stream(
                 
                 if chunk.get("done"):
                     break
+            
+            # Send final event with sources
+            if sources:
+                final_data = json.dumps({"token": "", "done": True, "sources": sources})
+                yield f"data: {final_data}\n\n"
 
             # Log the accumulated response for debugging
             logger.info(f"Chat complete: user_message_length={len(payload.message)}, response_length={len(full_response)}, response_preview='{full_response[:100]}'")
@@ -189,7 +203,8 @@ async def chat_stream(
                     role="assistant",
                     content=full_response,
                     search_mode=payload.searchMode,
-                    model_used=payload.model
+                    model_used=payload.model,
+                    sources=json.dumps(sources) if sources else None  # Store sources as JSON
                 )
                 session.add(assistant_message)
                 session.commit()

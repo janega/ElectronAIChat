@@ -184,9 +184,14 @@ async def get_user_chats(user_id: str, limit: int = 50, offset: int = 0, session
 async def get_chat_detail(chat_id: str, session: DBSession):
     """Get full chat with all messages and documents."""
     try:
+        from app.database import MessageResponse
+        
         chat = session.get(Chat, chat_id)
         if not chat:
             raise HTTPException(status_code=404, detail=f"Chat with ID '{chat_id}' not found")
+        
+        # Convert messages to response format with parsed sources
+        messages_parsed = [MessageResponse.from_message(msg) for msg in chat.messages]
         
         return ChatDetailResponse(
             id=chat.id,
@@ -194,7 +199,7 @@ async def get_chat_detail(chat_id: str, session: DBSession):
             search_mode=chat.search_mode,
             created_at=chat.created_at,
             updated_at=chat.updated_at,
-            messages=chat.messages,
+            messages=messages_parsed,
             documents=chat.documents
         )
     except HTTPException:

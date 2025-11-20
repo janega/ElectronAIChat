@@ -6,6 +6,13 @@ export interface Message {
   timestamp: string;
   error?: string;           // Error message if generation failed
   isRetrying?: boolean;     // True when retry is in progress
+  sources?: Array<{         // Document sources used in RAG
+    filename: string;
+    chatId?: string;
+  }>;
+  modelUsed?: string;       // Model used for generation
+  tokensUsed?: number;      // Total tokens consumed
+  responseTime?: number;    // Response time in seconds
 }
 
 export interface Document {
@@ -65,6 +72,7 @@ export interface StreamChunk {
   token?: string;
   content?: string;
   done?: boolean;
+  sources?: Array<{filename: string; chatId?: string}>;
 }
 
 export type PageType = 'chat' | 'settings';

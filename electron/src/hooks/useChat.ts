@@ -54,6 +54,24 @@ export function useChat() {
           (chunk) => {
             fullResponse += chunk.token || chunk.content || '';
             
+            // Capture sources from final chunk (when done=true)
+            if (chunk.done && chunk.sources) {
+              // Store sources to attach to final message
+              const aiMessage: Message = {
+                id: aiMessageId,
+                role: 'assistant',
+                content: fullResponse,
+                timestamp: new Date().toISOString(),
+                sources: chunk.sources,
+              };
+              
+              if (aiMessageAdded) {
+                // Update existing message with sources
+                onStreamUpdate?.(chatId, aiMessage, false);
+              }
+              return; // Don't process further for done event
+            }
+            
             // Build AI message as stream progresses
             if (!aiMessageAdded && fullResponse.trim()) {
               const aiMessage: Message = {

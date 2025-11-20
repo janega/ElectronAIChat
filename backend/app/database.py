@@ -28,7 +28,7 @@ class User(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     username: str = Field(unique=True, index=True)
     email: Optional[str] = Field(default=None, unique=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
     
     # Relationships
     chats: List["Chat"] = Relationship(
@@ -61,7 +61,7 @@ class UserSettings(SQLModel, table=True):
     use_memory: bool = Field(default=True)
     use_mcp: bool = Field(default=True)
     
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
     
     # Relationships
     user: User = Relationship(back_populates="settings")
@@ -77,8 +77,8 @@ class Chat(SQLModel, table=True):
     title: str = Field(default="New Chat")
     search_mode: str = Field(default="normal")  # normal, embeddings, all
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
     
     # Relationships
     user: User = Relationship(back_populates="chats")
@@ -107,8 +107,9 @@ class Message(SQLModel, table=True):
     model_used: Optional[str] = Field(default=None)
     tokens_used: Optional[int] = Field(default=None)
     response_time: Optional[float] = Field(default=None)  # seconds
+    sources: Optional[str] = Field(default=None)  # JSON string of document sources used in RAG
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
     
     # Relationships
     chat: Chat = Relationship(back_populates="messages")
@@ -131,7 +132,7 @@ class Document(SQLModel, table=True):
     source_metadata: Optional[str] = Field(default=None)  # JSON string
     chunks_count: int = Field(default=0)
     
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
     
     # Relationships
     chat: Chat = Relationship(back_populates="documents")
@@ -187,6 +188,44 @@ class ChatResponse(SQLModel):
     last_message: Optional[str] = None
 
 
+class MessageResponse(SQLModel):
+    """Response model for message with parsed sources"""
+    id: str
+    chat_id: str
+    role: str
+    content: str
+    search_mode: Optional[str] = None
+    model_used: Optional[str] = None
+    tokens_used: Optional[int] = None
+    response_time: Optional[float] = None
+    created_at: datetime
+    sources: Optional[List[dict]] = None  # Parsed from JSON string
+    
+    @classmethod
+    def from_message(cls, message: "Message"):
+        """Convert Message model to response with parsed sources"""
+        import json
+        sources_parsed = None
+        if message.sources:
+            try:
+                sources_parsed = json.loads(message.sources)
+            except:
+                pass
+        
+        return cls(
+            id=message.id,
+            chat_id=message.chat_id,
+            role=message.role,
+            content=message.content,
+            search_mode=message.search_mode,
+            model_used=message.model_used,
+            tokens_used=message.tokens_used,
+            response_time=message.response_time,
+            created_at=message.created_at,
+            sources=sources_parsed
+        )
+
+
 class ChatDetailResponse(SQLModel):
     """Response model for full chat with messages"""
     id: str
@@ -194,7 +233,7 @@ class ChatDetailResponse(SQLModel):
     search_mode: str
     created_at: datetime
     updated_at: datetime
-    messages: List[Message]
+    messages: List[MessageResponse]
     documents: List[Document]
 
 
