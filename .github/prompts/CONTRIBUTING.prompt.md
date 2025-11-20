@@ -16,7 +16,7 @@ mode: agent
 
 ## Backend Guidelines
 - Use FastAPI dependency injection for testability
-- Validate inputs with Pydantic models
+- Validate inputs with Pydantic or PydanticAI models
 - Handle errors gracefully with structured responses
 - Document APIs with OpenAPI/Swagger
 - Optimize for async performance where appropriate
