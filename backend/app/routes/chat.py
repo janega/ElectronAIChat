@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.config import logger
 from .dependencies import get_langchain_manager, get_mem0_manager, get_openai_client, DBSession
+from .chats import generate_title_background
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -193,6 +194,13 @@ async def chat_stream(
                 session.add(assistant_message)
                 session.commit()
                 logger.debug(f"Saved assistant response to database (chat: {payload.chatId})")
+                
+                # Auto-generate title after 2 messages (user + assistant = first exchange)
+                if len(chat.messages) == 4 and chat.title == "New Chat":
+                    logger.info(f"Auto-triggering title generation for chat {payload.chatId} (2 messages)")
+                    # Fire and forget background task
+                    asyncio.create_task(generate_title_background(payload.chatId, openai_client))
+                    
             except Exception:
                 logger.exception("Failed to save assistant response to database")
                 session.rollback()

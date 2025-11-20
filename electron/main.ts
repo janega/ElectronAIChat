@@ -64,17 +64,33 @@ function createWindow() {
 //
 // Wait for backend health endpoint
 //
-async function waitForHealth(url: string | URL | Request, timeoutMs = 30000, intervalMs = 300) {
+async function waitForHealth(url: string | URL | Request, timeoutMs = 30000, intervalMs = 500) {
   const start = Date.now();
+  let attempts = 0;
+  
+  console.log(`⏳ Waiting for backend to start (timeout: ${timeoutMs/1000}s)...`);
+  console.log(`   Note: First startup may take longer (database initialization, model loading)`);
+  
   while (true) {
     try {
       const res = await fetch(url);
-      if (res.ok) return;
+      if (res.ok) {
+        const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+        console.log(`✅ Backend health check passed after ${elapsed}s (${attempts + 1} attempts)`);
+        return;
+      }
     } catch {
-      // ignore until timeout
+      attempts++;
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      
+      // Log progress every 5 seconds with elapsed time
+      if (elapsed > 0 && elapsed % 5 === 0 && attempts % 10 === 0) {
+        console.log(`⏳ Still waiting... ${elapsed}s elapsed (${attempts} attempts)`);
+      }
     }
+    
     if (Date.now() - start >= timeoutMs) {
-      throw new Error(`Timeout waiting for health endpoint: ${url}`);
+      throw new Error(`Timeout waiting for health endpoint after ${attempts} attempts (${timeoutMs}ms)`);
     }
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
@@ -93,13 +109,32 @@ function startBackend() {
     ? path.join(process.resourcesPath, "backend.exe")
     : path.join(__dirname, "..","..", "backend", "dist", "backend.exe");
 
-  console.log("Spawning backend...");
+  console.log("Spawning backend:", backendPath);
   backendProcess = spawn(backendPath, [], {
     cwd: path.dirname(backendPath),
     stdio: "ignore",
     windowsHide: true,
   });
   console.log("Spawned backend with pid:", backendProcess.pid);
+
+  // Monitor backend process for crashes
+  backendProcess.on('exit', (code, signal) => {
+    if (code !== 0 && code !== null) {
+      console.error(`❌ Backend exited with code ${code}, signal ${signal}`);
+      dialog.showErrorBox(
+        'Backend Crashed',
+        `The backend process exited unexpectedly (code ${code}). Please restart the application.`
+      );
+    }
+  });
+
+  backendProcess.on('error', (err) => {
+    console.error('❌ Backend spawn error:', err);
+    dialog.showErrorBox(
+      'Backend Error',
+      `Failed to start backend: ${err.message}`
+    );
+  });
 }
 
 //
@@ -138,18 +173,33 @@ app.whenReady().then(async () => {
     console.log('Theme changed to:', theme);
   });
 
-  // startBackend();
+  console.log('🔍 Environment check:', {
+    isPackaged: app.isPackaged,
+    appPath: app.getAppPath(),
+    execPath: process.execPath,
+    cwd: process.cwd()
+  });
 
-  try {
-    await waitForHealth("http://127.0.0.1:8000/api/health", 100000);
-    console.log("✅ Backend is ready, launching window...");
-    createWindow();
-  } catch (err) {
-    console.error("❌ Backend failed to become ready:", err);
-    dialog.showErrorBox(
-      "Backend Error",
-      "Backend failed to start. See console for details."
-    );
+  if (app.isPackaged){  
+    // Production: Start backend and wait for health check
+    console.log('📦 Running in PACKAGED mode');
+    startBackend();
+    
+    try {
+      await waitForHealth("http://127.0.0.1:8000/api/health", 30000);
+      console.log("✅ Backend is ready, launching window...");
+      createWindow();
+    } catch (err) {
+      console.error("❌ Backend failed to become ready:", err);
+      dialog.showErrorBox(
+        "Backend Error",
+        "Backend failed to start. See console for details."
+      );
+      createWindow();
+    }
+  } else {
+    // Development: Assume backend is manually started, launch window immediately
+    console.log("🔧 Running in DEVELOPMENT mode: Skipping backend startup (start manually)");
     createWindow();
   }
 });

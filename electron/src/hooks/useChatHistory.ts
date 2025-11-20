@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Chat } from '../types';
+import { Chat, Message } from '../types';
 import { STORAGE_KEYS } from '../utils/constants';
 import { apiClient } from '../utils/api';
 
-export function useChatHistory(username?: string) {
+export function useChatHistory(userId?: string) {
   const [chats, setChats] = useState<Chat[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CHATS);
     return saved ? JSON.parse(saved) : [];
@@ -30,14 +30,14 @@ export function useChatHistory(username?: string) {
 
   // Sync chats from backend
   const syncFromBackend = useCallback(async () => {
-    if (!username) {
-      console.warn('No username provided for sync');
+    if (!userId) {
+      console.warn('No userId provided for sync');
       return;
     }
 
     try {
       setIsSyncing(true);
-      const backendChats = await apiClient.getUserChats(username);
+      const backendChats = await apiClient.getUserChats(userId);
       
       // Merge backend chats with localStorage
       // Backend is source of truth - use backend data if available
@@ -85,17 +85,17 @@ export function useChatHistory(username?: string) {
     } finally {
       setIsSyncing(false);
     }
-  }, [username]);
+  }, [userId]);
 
   // Sync unsynced local chats to backend
   const syncUnsyncedChats = useCallback(async () => {
-    if (!username) return;
+    if (!userId) return;
 
     const unsyncedChats = chats.filter((chat) => !chat.isSynced && chat.id.startsWith('local-'));
     
     for (const localChat of unsyncedChats) {
       try {
-        const backendChat = await apiClient.createChat(username, localChat.title);
+        const backendChat = await apiClient.createChat(userId, localChat.title);
         
         // Update local chat with server ID
         setChats((prev) =>
@@ -115,7 +115,7 @@ export function useChatHistory(username?: string) {
         // Continue with next chat
       }
     }
-  }, [chats, username]);
+  }, [chats, userId]);
 
   const createNewChat = async (): Promise<Chat> => {
     // Create temporary local chat immediately for instant UI
@@ -135,9 +135,11 @@ export function useChatHistory(username?: string) {
     setCurrentChatId(tempId);
 
     // Sync to backend in background
-    if (username) {
+    if (userId) {
       try {
-        const backendChat = await apiClient.createChat(username, newChat.title);
+        console.log('[createNewChat] Syncing to backend with userId:', userId);
+        const backendChat = await apiClient.createChat(userId, newChat.title);
+        console.log('[createNewChat] Backend response:', backendChat);
         
         // Update chat with server ID
         setChats((prev) =>
@@ -163,6 +165,8 @@ export function useChatHistory(username?: string) {
   };
 
   const updateChat = async (chatId: string, updates: Partial<Chat>) => {
+    console.log('[useChatHistory] Updating chat:', chatId, updates);
+    
     // Update locally first for immediate UI feedback
     setChats((prev) =>
       prev.map((c) =>
@@ -226,21 +230,36 @@ export function useChatHistory(username?: string) {
   const unsyncedCount = chats.filter((chat) => !chat.isSynced).length;
 
   const generateTitleIfNeeded = useCallback(async (chatId: string) => {
-    // CRITICAL: Check username at execution time
-    if (!username) {
-      console.log('[Title Gen] Skip: No username available');
+    // CRITICAL: Check userId at execution time
+    if (!userId) {
+      console.log('[Title Gen] Skip: No userId available');
       return;
     }
 
     // Use functional setState to get latest chats without stale closure
     let chat: Chat | undefined;
     setChats((prev) => {
-      chat = prev.find((c) => c.id === chatId);
+      console.log('[Title Gen] Searching in chats array:', {
+        totalChats: prev.length,
+        chatIds: prev.map(c => ({ id: c.id, serverChatId: c.serverChatId })),
+        searchingFor: chatId
+      });
+      
+      // Search by both local ID and server ID to handle both cases
+      chat = prev.find((c) => c.id === chatId || c.serverChatId === chatId);
+      
+      console.log('[Title Gen] Search result:', {
+        found: !!chat,
+        foundChatId: chat?.id,
+        foundServerChatId: chat?.serverChatId
+      });
+      
       return prev; // No change, just reading
     });
     
     console.log('[Title Gen] Checking chat:', chatId, {
       exists: !!chat,
+      localId: chat?.id,
       isSynced: chat?.isSynced,
       title: chat?.title,
       messageCount: chat?.messages.length,
@@ -276,16 +295,16 @@ export function useChatHistory(username?: string) {
         setTimeout(async () => {
           try {
             console.log('[Title Gen] Polling for updated title...');
-            const backendChats = await apiClient.getUserChats(username);
+            const backendChats = await apiClient.getUserChats(userId!);
             const updatedChat = backendChats.find((c: any) => c.id === chat!.serverChatId);
             
             console.log('[Title Gen] Found updated chat:', updatedChat?.title);
             
             if (updatedChat && updatedChat.title !== 'New Chat') {
-              // Update local state with new title - force new object reference for React re-render
+              // Update local state with new title - use the LOCAL ID we found earlier
               setChats((prev) => {
                 const updated = prev.map((c) =>
-                  c.id === chatId
+                  c.id === chat!.id  // Use LOCAL ID, not the passed chatId
                     ? { ...c, title: updatedChat.title, updatedAt: new Date().toISOString() }
                     : c
                 );
@@ -306,7 +325,39 @@ export function useChatHistory(username?: string) {
       console.error('[Title Gen] Failed to generate chat title:', error);
       // Fail silently - not critical
     }
-  }, [username]);
+  }, [userId]);
+
+  // Update a specific message in a specific chat (for streaming updates)
+  const updateChatMessage = useCallback((chatId: string, aiMessage: Message) => {
+    console.log('[useChatHistory] Updating message in chat:', chatId, 'message ID:', aiMessage.id);
+    
+    setChats((prev) =>
+      prev.map((chat) => {
+        if (chat.id === chatId) {
+          // Check if message exists (update) or is new (add)
+          const existingIndex = chat.messages.findIndex((m) => m.id === aiMessage.id);
+          
+          let updatedMessages: Message[];
+          if (existingIndex >= 0) {
+            // Update existing message (streaming updates)
+            updatedMessages = chat.messages.map((m) =>
+              m.id === aiMessage.id ? aiMessage : m
+            );
+          } else {
+            // Add new message
+            updatedMessages = [...chat.messages, aiMessage];
+          }
+          
+          return {
+            ...chat,
+            messages: updatedMessages,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return chat;
+      })
+    );
+  }, []);
 
   return {
     chats,
@@ -314,6 +365,7 @@ export function useChatHistory(username?: string) {
     setCurrentChatId,
     createNewChat,
     updateChat,
+    updateChatMessage,
     deleteChat,
     getCurrentChat,
     syncFromBackend,

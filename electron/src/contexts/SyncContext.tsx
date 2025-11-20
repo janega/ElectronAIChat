@@ -9,6 +9,7 @@ interface SyncContextType {
   syncError: string | null;
   syncMode: SyncMode;
   username: string | null;
+  userId: string | null;
   
   setIsSyncing: (syncing: boolean) => void;
   setLastSyncTime: (time: number) => void;
@@ -16,6 +17,7 @@ interface SyncContextType {
   setSyncError: (error: string | null) => void;
   setSyncMode: (mode: SyncMode) => void;
   setUsername: (username: string) => void;
+  setUserId: (userId: string) => void;
   triggerSync: () => void;
 }
 
@@ -24,6 +26,7 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 const STORAGE_KEYS = {
   SYNC_MODE: 'sync_mode',
   USERNAME: 'app_username',
+  USER_ID: 'app_user_id',
   LAST_SYNC: 'last_sync_time',
 };
 
@@ -47,6 +50,9 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, onSyncTrig
   const [username, setUsernameState] = useState<string | null>(() => {
     return localStorage.getItem(STORAGE_KEYS.USERNAME);
   });
+  const [userId, setUserIdState] = useState<string | null>(() => {
+    return localStorage.getItem(STORAGE_KEYS.USER_ID);
+  });
 
   // Persist sync mode to localStorage
   const setSyncMode = useCallback((mode: SyncMode) => {
@@ -58,6 +64,12 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, onSyncTrig
   const setUsername = useCallback((user: string) => {
     setUsernameState(user);
     localStorage.setItem(STORAGE_KEYS.USERNAME, user);
+  }, []);
+
+  // Persist user ID to localStorage
+  const setUserId = useCallback((id: string) => {
+    setUserIdState(id);
+    localStorage.setItem(STORAGE_KEYS.USER_ID, id);
   }, []);
 
   // Persist last sync time to localStorage
@@ -101,12 +113,14 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, onSyncTrig
     syncError,
     syncMode,
     username,
+    userId,
     setIsSyncing,
     setLastSyncTime,
     setUnsyncedCount,
     setSyncError,
     setSyncMode,
     setUsername,
+    setUserId,
     triggerSync,
   };
 

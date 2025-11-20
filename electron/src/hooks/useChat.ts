@@ -14,22 +14,15 @@ export function useChat() {
     async (
       content: string,
       chatId: string,
-      username: string,
+      userId: string,
       searchMode: string,
       documentIds: string[],
-      settings: AppSettings
+      settings: AppSettings,
+      skipUserMessage = false, // Skip adding user message for retry scenarios
+      onStreamUpdate?: (chatId: string, aiMessage: Message, isDone: boolean) => void // Callback to update specific chat
     ) => {
-      if (!content.trim() || !chatId || !username) return;
+      if (!content.trim() || !chatId || !userId) return;
 
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        role: 'user',
-        content,
-        searchMode: searchMode as any,
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
 
       const aiMessageId = (Date.now() + 1).toString();
@@ -41,7 +34,7 @@ export function useChat() {
         // Updated to match new backend ChatRequest model
         const payload = {
           chatId,
-          userId: username,
+          userId: userId,
           message: content,
           searchMode,
           model: settings.model,
@@ -61,7 +54,7 @@ export function useChat() {
           (chunk) => {
             fullResponse += chunk.token || chunk.content || '';
             
-            // Only add the AI message bubble once we have content
+            // Build AI message as stream progresses
             if (!aiMessageAdded && fullResponse.trim()) {
               const aiMessage: Message = {
                 id: aiMessageId,
@@ -69,61 +62,72 @@ export function useChat() {
                 content: fullResponse,
                 timestamp: new Date().toISOString(),
               };
-              setMessages((prev) => [...prev, aiMessage]);
               aiMessageAdded = true;
+              
+              // Notify parent to update the specific chat (streaming in progress)
+              onStreamUpdate?.(chatId, aiMessage, false);
             } else if (aiMessageAdded) {
               // Update existing message
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === aiMessageId
-                    ? { ...m, content: fullResponse }
-                    : m
-                )
-              );
+              const updatedMessage: Message = {
+                id: aiMessageId,
+                role: 'assistant',
+                content: fullResponse,
+                timestamp: new Date().toISOString(),
+              };
+              
+              // Notify parent to update the specific chat (streaming in progress)
+              onStreamUpdate?.(chatId, updatedMessage, false);
             }
           },
           (error) => {
-            console.error('Stream error:', error);
+            console.error('[useChat] Stream error:', error);
             
-            // Add error message if no message was added yet
-            if (!aiMessageAdded) {
-              const errorMessage: Message = {
-                id: aiMessageId,
-                role: 'assistant',
-                content: `Error: ${error.message}`,
-                timestamp: new Date().toISOString(),
-                error: error.message,
-              };
-              setMessages((prev) => [...prev, errorMessage]);
-            } else {
-              // Update existing message with error
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === aiMessageId
-                    ? { ...m, content: `Error: ${error.message}`, error: error.message }
-                    : m
-                )
-              );
-            }
+            // Build error message
+            const errorMessage: Message = {
+              id: aiMessageId,
+              role: 'assistant',
+              content: `Error: ${error.message}`,
+              timestamp: new Date().toISOString(),
+              error: error.message,
+            };
+            aiMessageAdded = true;
+            
+            // Notify parent to update the specific chat (stream done with error)
+            onStreamUpdate?.(chatId, errorMessage, true);
             setIsLoading(false);
             activeStreamsRef.current.delete(chatId);
+            console.log('[useChat] Cleared stream for chat after error:', chatId);
           },
           () => {
             // Stream completed successfully
+            console.log('[useChat] Stream completed for chat:', chatId);
             setIsLoading(false);
             activeStreamsRef.current.delete(chatId);
+            
+            // Notify parent that stream is complete (no new message, just status)
+            if (aiMessageAdded) {
+              // Send the final message with isDone=true
+              const finalMessage: Message = {
+                id: aiMessageId,
+                role: 'assistant',
+                content: '', // Placeholder, will be ignored
+                timestamp: new Date().toISOString(),
+              };
+              onStreamUpdate?.(chatId, finalMessage, true);
+            }
           }
         );
         
         // Store cleanup function for this chat's stream
         cleanupRef.current = streamCleanup;
         activeStreamsRef.current.set(chatId, streamCleanup);
+        console.log('[useChat] Started stream for chat:', chatId);
       } catch (error) {
         console.error('Failed to send message:', error);
         
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         
-        // Add error message if stream never started
+        // Notify parent about error if stream never started
         if (!aiMessageAdded) {
           const errorMessage: Message = {
             id: aiMessageId,
@@ -132,20 +136,7 @@ export function useChat() {
             timestamp: new Date().toISOString(),
             error: errorMsg,
           };
-          setMessages((prev) => [...prev, errorMessage]);
-        } else {
-          // Update existing message with error
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiMessageId
-                ? {
-                    ...m,
-                    content: `Error: ${errorMsg}`,
-                    error: errorMsg,
-                  }
-                : m
-            )
-          );
+          onStreamUpdate?.(chatId, errorMessage, true);
         }
         setIsLoading(false);
       }

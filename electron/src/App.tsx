@@ -20,7 +20,9 @@ function AppContent() {
   const { settings, updateSetting } = useSettings();
   const { 
     username, 
-    setUsername, 
+    userId,
+    setUsername,
+    setUserId,
     setIsSyncing,
     setLastSyncTime,
     setUnsyncedCount
@@ -32,6 +34,7 @@ function AppContent() {
     setCurrentChatId,
     createNewChat,
     updateChat,
+    updateChatMessage,
     deleteChat,
     getCurrentChat,
     syncFromBackend,
@@ -40,7 +43,7 @@ function AppContent() {
     isInitialSyncComplete,
     unsyncedCount,
     generateTitleIfNeeded,
-  } = useChatHistory(username || undefined);
+  } = useChatHistory(userId || undefined);
   const { messages, setMessages, isLoading, sendMessage, stopStream, cleanup } =
     useChat();
 
@@ -54,7 +57,6 @@ function AppContent() {
   const [isInitializing, setIsInitializing] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null!);
-  const isLoadingChatRef = useRef(false);
 
   const currentChat = getCurrentChat();
 
@@ -68,11 +70,12 @@ function AppContent() {
         return;
       }
 
-      // Username exists, ensure user exists in backend and sync
+      // Username exists, ensure user exists in backend and get user ID
       try {
         setIsSyncing(true);
         // Create or get user (idempotent - returns existing user if already exists)
-        await apiClient.createUser(username);
+        const userResponse = await apiClient.createUser(username);
+        setUserId(userResponse.id); // Store user ID
         await syncFromBackend();
         await syncUnsyncedChats();
         setLastSyncTime(Date.now());
@@ -87,56 +90,34 @@ function AppContent() {
     initialize();
   }, []); // Only run once on mount
 
-  // Backfill titles for existing chats with 2-3 messages (one-time check after sync)
-  useEffect(() => {
-    if (isInitialSyncComplete && chats.length > 0) {
-      console.log('[Title Backfill] Checking existing chats for title generation...', {
-        totalChats: chats.length,
-        username
-      });
-      
-      const chatsNeedingTitles = chats.filter(
-        chat => chat.isSynced && 
-                chat.title === 'New Chat' && 
-                chat.messages.length >= 2
-      );
-      
-      console.log('[Title Backfill] Chats needing titles:', chatsNeedingTitles.map(c => ({
-        id: c.id,
-        serverChatId: c.serverChatId,
-        messageCount: c.messages.length,
-        title: c.title
-      })));
-      
-      if (chatsNeedingTitles.length > 0) {
-        console.log(`[Title Backfill] ✅ Found ${chatsNeedingTitles.length} chats needing titles`);
-        // Stagger the requests to avoid overwhelming the backend
-        chatsNeedingTitles.forEach((chat, index) => {
-          setTimeout(() => {
-            console.log(`[Title Backfill] 🚀 Generating title for chat ${index + 1}/${chatsNeedingTitles.length}:`, chat.serverChatId || chat.id);
-            generateTitleIfNeeded(chat.id);
-          }, index * 2000); // 2 second delay between each
-        });
-      } else {
-        console.log('[Title Backfill] No chats need titles');
-      }
-    }
-  }, [isInitialSyncComplete, chats, generateTitleIfNeeded, username]); // Include all dependencies
-
   // Handle username submission from modal
   const handleUsernameSet = async (newUsername: string) => {
-    setUsername(newUsername);
-    setShowUsernameModal(false);
     setIsInitializing(true);
 
     // Create or get user in backend first
     try {
       setIsSyncing(true);
-      await apiClient.createUser(newUsername);
+      console.log('[App] Creating user in backend:', newUsername);
+      const userResponse = await apiClient.createUser(newUsername);
+      console.log('[App] User created/retrieved:', userResponse);
+      
+      // Store both username and user ID (context handles localStorage)
+      setUsername(newUsername);
+      setUserId(userResponse.id);
+      
       await syncFromBackend();
+      await syncUnsyncedChats(); // Sync any local-only chats created before username was set
       setLastSyncTime(Date.now());
+      
+      // Only close modal after successful initialization
+      setShowUsernameModal(false);
     } catch (error) {
-      console.error('Initial sync failed:', error);
+      console.error('[App] Initial sync failed:', error);
+      // Show error to user and don't close modal
+      alert(`Failed to initialize: ${error instanceof Error ? error.message : String(error)}\n\nPlease check that the backend is running.`);
+      setIsInitializing(false);
+      setIsSyncing(false);
+      return; // Don't close modal on error
     } finally {
       setIsSyncing(false);
       setIsInitializing(false);
@@ -167,91 +148,38 @@ function AppContent() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load current chat
+  // Sync visible messages from chat history - THIS IS THE SINGLE SOURCE OF TRUTH
+  // Runs whenever chats array updates OR currentChatId changes
   useEffect(() => {
     if (currentChat) {
-      isLoadingChatRef.current = true;
-      setMessages(currentChat.messages);
+      console.log('[App] Syncing visible messages from chat history:', currentChat.id, {
+        messageCount: currentChat.messages.length,
+        isStreaming: currentChat.isStreaming
+      });
+      
+      // Always sync from chat history - this is the single source of truth
+      setMessages([...currentChat.messages]); // Create new array to ensure React detects change
       setUploadedDocs(currentChat.documents.map(doc => ({ ...doc, status: 'ready' as const, progress: 100 })));
       setSearchMode(currentChat.searchMode);
-      // Reset the flag after a brief delay to allow state updates to settle
-      setTimeout(() => {
-        isLoadingChatRef.current = false;
-      }, 0);
     }
-  }, [currentChatId]);
+  }, [currentChatId, chats]); // Watch BOTH currentChatId AND chats array
+
+  // Note: isStreaming is now cleared via the stream callback's isDone flag
+  // This ensures the correct chat's flag is cleared, not just the current one
 
   // Cleanup on unmount
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
 
-  // Sync messages and searchMode to localStorage only (debounced)
+  // Sync searchMode to chat history when it changes
   useEffect(() => {
-    if (!isLoadingChatRef.current && currentChatId && messages.length > 0) {
-      // Debounce: only sync after activity stops (streaming, typing, etc.)
-      const timer = setTimeout(() => {
-        updateChat(currentChatId, {
-          messages,
-          searchMode: searchMode as any, // Just UI state, stored locally
-        });
-      }, 1000); // Wait 1 second of inactivity
-      
-      return () => clearTimeout(timer);
+    if (currentChatId) {
+      updateChat(currentChatId, {
+        searchMode: searchMode as any,
+      });
     }
-  }, [messages, currentChatId, searchMode]);
-
-  // Trigger title generation after 2 messages (optimal context window)
-  useEffect(() => {
-    const shouldTrigger = !isLoadingChatRef.current && 
-                          currentChatId && 
-                          messages.length === 2; // Only trigger once at 2 messages
-    
-    console.log('[App] Title generation check:', {
-      shouldTrigger,
-      isLoading: isLoadingChatRef.current,
-      currentChatId,
-      messageCount: messages.length,
-      isSynced: currentChat?.isSynced,
-      serverChatId: currentChat?.serverChatId,
-      title: currentChat?.title
-    });
-    
-    if (shouldTrigger) {
-      console.log('[App] ✅ Scheduling title generation...');
-      const timer = setTimeout(() => {
-        console.log('[App] 🚀 Calling generateTitleIfNeeded for:', currentChatId);
-        generateTitleIfNeeded(currentChatId);
-      }, 1500); // Increased delay to ensure chat is synced
-      
-      return () => clearTimeout(timer);
-    }
-  }, [messages.length, currentChatId, generateTitleIfNeeded]);
-
-  // Also trigger when chat becomes synced (handles race condition)
-  useEffect(() => {
-    const shouldTriggerOnSync = currentChat?.isSynced && 
-                                currentChat.title === 'New Chat' && 
-                                currentChat.messages.length >= 2;
-    
-    console.log('[App] Sync-based title generation check:', {
-      shouldTriggerOnSync,
-      isSynced: currentChat?.isSynced,
-      serverChatId: currentChat?.serverChatId,
-      title: currentChat?.title,
-      messageCount: currentChat?.messages.length
-    });
-    
-    if (shouldTriggerOnSync) {
-      console.log('[App] ✅ Chat just synced, triggering title generation...');
-      const timer = setTimeout(() => {
-        console.log('[App] 🚀 Calling generateTitleIfNeeded (sync-triggered) for:', currentChat.id);
-        generateTitleIfNeeded(currentChat.id);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [currentChat?.isSynced, currentChat?.id, currentChat?.messages.length, currentChat?.title, generateTitleIfNeeded]);
+  }, [searchMode, currentChatId]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -261,59 +189,94 @@ function AppContent() {
   const handleSendMessage = async (content: string) => {
     if (!currentChatId || !username) return;
 
+    // Capture the chatId for stream updates (before any async operations)
+    const streamChatId = currentChatId;
+
+    // Create user message
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content,
+      searchMode: searchMode as any,
+      timestamp: new Date().toISOString(),
+    };
+
+    // ONLY update chat history - visible messages will sync via effect
+    updateChatMessage(streamChatId, userMessage);
+
     // Mark chat as streaming
-    updateChat(currentChatId, { isStreaming: true });
+    updateChat(streamChatId, { isStreaming: true });
 
     // Use serverChatId for backend API calls, fallback to local ID
-    const backendChatId = currentChat?.serverChatId || currentChatId;
+    const backendChatId = currentChat?.serverChatId || streamChatId;
     
-    console.log('[Send Message] Using chat ID:', {
-      localId: currentChatId,
+    console.log('[Send Message] Sending to chat:', {
+      localId: streamChatId,
       serverChatId: currentChat?.serverChatId,
       backendChatId,
       isSynced: currentChat?.isSynced
     });
+    
+    await sendMessage(
+      content,
+      backendChatId,
+      userId!,
+      searchMode,
+      uploadedDocs.map((d) => d.id),
+      settings,
+      false, // skipUserMessage
+      (chatId: string, aiMessage: Message, isDone: boolean) => {
+        console.log('[Stream Update] Updating chat history for:', streamChatId, {
+          messageId: aiMessage.id,
+          isDone,
+          contentLength: aiMessage.content.length
+        });
+        
+        // ONLY update chat history - visible messages sync automatically via effect
+        if (!isDone || aiMessage.content) {
+          updateChatMessage(streamChatId, aiMessage);
+        }
+        
+        // Clear isStreaming flag when stream completes
+        if (isDone) {
+          console.log('[Stream Update] Stream completed for chat:', streamChatId);
+          updateChat(streamChatId, { isStreaming: false });
+          
+          // Check for title update after 2 messages (backend auto-generates)
+          const chat = chats.find(c => c.id === streamChatId);
+          if (chat?.messages.length === 2 && chat.title === 'New Chat' && chat.serverChatId) {
+            // Poll for title update after a delay (backend needs time to generate)
+            setTimeout(async () => {
+              try {
+                const updatedChat = await apiClient.getChatDetail(chat.serverChatId!);
+                if (updatedChat.title !== 'New Chat') {
+                  updateChat(streamChatId, { title: updatedChat.title });
+                  console.log('[Title Update] Received new title:', updatedChat.title);
+                }
+              } catch (error) {
+                console.error('[Title Update] Failed to fetch title:', error);
+              }
+            }, 4000); // Wait 4 seconds for backend title generation
+          }
+        }
+      }
+    );
 
-    try {
-      await sendMessage(
-        content,
-        backendChatId,
-        username,
-        searchMode,
-        uploadedDocs.map((d) => d.id),
-        settings
-      );
-    } finally {
-      // Mark chat as no longer streaming
-      updateChat(currentChatId, { isStreaming: false });
-    }
-
-    // Note: messages state will be updated by useChat hook
-    // We'll sync to chat history in a separate effect
+    // Note: isStreaming will be cleared by the effect watching isLoading
+    // messages state will be updated by useChat hook
   };
 
   const handleSelectChat = (chatId: string) => {
-    // Check if current chat is streaming
-    const streamingChat = chats.find(c => c.isStreaming);
+    // Don't switch if already on this chat
+    if (chatId === currentChatId) return;
     
-    if (streamingChat && streamingChat.id !== chatId) {
-      console.log('[Chat Switch] Warning: Switching away from streaming chat:', streamingChat.id);
-      // In the future, we could show a confirmation dialog here
-      // For now, we allow switching but log a warning
-    }
-    
+    // Just switch - no need to save messages, they're already in chat history
+    console.log('[Chat Switch] Switching from', currentChatId, 'to', chatId);
     setCurrentChatId(chatId);
   };
 
   const handleRetryMessage = async (userMessage: Message) => {
     if (!currentChatId || !username || userMessage.role !== 'user') return;
-
-    // Mark message as retrying
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === userMessage.id ? { ...m, isRetrying: true } : m
-      )
-    );
 
     // Remove any AI response that came after this message (if it failed)
     const messageIndex = messages.findIndex((m) => m.id === userMessage.id);
@@ -324,14 +287,52 @@ function AppContent() {
       }
     }
 
-    // Unmark as retrying and resend
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === userMessage.id ? { ...m, isRetrying: false } : m
-      )
-    );
+    // Mark chat as streaming
+    updateChat(currentChatId, { isStreaming: true });
+
+    // Use serverChatId for backend API calls, fallback to local ID
+    const backendChatId = currentChat?.serverChatId || currentChatId;
     
-    await handleSendMessage(userMessage.content);
+    console.log('[Retry Message] Retrying for chat:', {
+      localId: currentChatId,
+      serverChatId: currentChat?.serverChatId,
+      backendChatId,
+      messageContent: userMessage.content.substring(0, 50)
+    });
+
+    // Capture the chatId for stream updates
+    const streamChatId = currentChatId;
+    
+    // Resend WITHOUT adding a new user message (the original user message stays)
+    await sendMessage(
+      userMessage.content,
+      backendChatId,
+      userId!,
+      searchMode,
+      uploadedDocs.map((d) => d.id),
+      settings,
+      true, // skipUserMessage = true for retry
+      (chatId: string, aiMessage: Message, isDone: boolean) => {
+        console.log('[Retry Stream Update] Updating chat history for:', streamChatId, {
+          messageId: aiMessage.id,
+          isDone,
+          contentLength: aiMessage.content.length
+        });
+        
+        // ONLY update chat history - visible messages sync automatically via effect
+        if (!isDone || aiMessage.content) {
+          updateChatMessage(streamChatId, aiMessage);
+        }
+        
+        // Clear isStreaming flag when stream completes
+        if (isDone) {
+          console.log('[Retry Stream Update] Stream completed for chat:', streamChatId);
+          updateChat(streamChatId, { isStreaming: false });
+        }
+      }
+    );
+
+    // Note: isStreaming will be cleared by the effect watching isLoading
   };
 
   const handleStopStream = () => {

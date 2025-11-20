@@ -123,7 +123,9 @@ async def create_chat(chat_data: ChatCreate, session: DBSession):
     """Create a new chat thread for dual localStorage/SQLite storage."""
     try:
         from app.database import User
+        logger.info(f"[create_chat] Received user_id: '{chat_data.user_id}' (type: {type(chat_data.user_id).__name__})")
         user = session.get(User, chat_data.user_id)
+        logger.info(f"[create_chat] User lookup result: {user}")
         
         if not user:
             raise HTTPException(status_code=404, detail=f"User with ID '{chat_data.user_id}' not found")
