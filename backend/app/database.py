@@ -13,7 +13,7 @@ All models use SQLModel (combines Pydantic validation + SQLAlchemy ORM).
 """
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 
@@ -28,7 +28,7 @@ class User(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     username: str = Field(unique=True, index=True)
     email: Optional[str] = Field(default=None, unique=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationships
     chats: List["Chat"] = Relationship(
@@ -61,7 +61,7 @@ class UserSettings(SQLModel, table=True):
     use_memory: bool = Field(default=True)
     use_mcp: bool = Field(default=True)
     
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user: User = Relationship(back_populates="settings")
@@ -77,8 +77,8 @@ class Chat(SQLModel, table=True):
     title: str = Field(default="New Chat")
     search_mode: str = Field(default="normal")  # normal, embeddings, all
     
-    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user: User = Relationship(back_populates="chats")
@@ -109,7 +109,7 @@ class Message(SQLModel, table=True):
     response_time: Optional[float] = Field(default=None)  # seconds
     sources: Optional[str] = Field(default=None)  # JSON string of document sources used in RAG
     
-    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationships
     chat: Chat = Relationship(back_populates="messages")
@@ -132,7 +132,7 @@ class Document(SQLModel, table=True):
     source_metadata: Optional[str] = Field(default=None)  # JSON string
     chunks_count: int = Field(default=0)
     
-    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationships
     chat: Chat = Relationship(back_populates="documents")

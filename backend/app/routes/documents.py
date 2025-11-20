@@ -5,7 +5,7 @@ Handles file uploads, text extraction (with OCR/JSON support), embedding generat
 """
 import uuid
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
@@ -119,7 +119,7 @@ async def upload_document(
                 metadata={
                     "doc_id": file_id,
                     "filename": file.filename,
-                    "uploaded_at": datetime.now(datetime.UTC).isoformat()
+                    "uploaded_at": datetime.now(timezone.utc).isoformat()
                 }
             )
         except Exception as e:
@@ -143,7 +143,7 @@ async def upload_document(
                 content_type=file.content_type,
                 size=size,
                 chunks_count=num_chunks,
-                uploaded_at=datetime.now(datetime.UTC)
+                uploaded_at=datetime.now(timezone.utc)
             )
             session.add(document)
             session.commit()
@@ -182,7 +182,7 @@ async def upload_document(
                 "id": file_id,
                 "name": file.filename,
                 "size": size,
-                "uploadedAt": datetime.now(datetime.UTC).isoformat(),
+                "uploadedAt": datetime.now(timezone.utc).isoformat(),
                 "contentType": file.content_type,
                 "chunks": num_chunks
             }
@@ -322,7 +322,7 @@ async def upload_document_stream(
                             'doc_id': file_id,
                             'filename': file.filename,
                             'chunk_index': i+j,
-                            'uploaded_at': datetime.now(datetime.UTC).isoformat()
+                            'uploaded_at': datetime.now(timezone.utc).isoformat()
                         }
                     )
                     for j, chunk in enumerate(batch)
@@ -352,7 +352,7 @@ async def upload_document_stream(
                     content_type=file.content_type,
                     size=size,
                     chunks_count=total_chunks,
-                    uploaded_at=datetime.now(datetime.UTC)
+                    uploaded_at=datetime.now(timezone.utc)
                 )
                 session.add(document)
                 session.commit()
@@ -382,7 +382,7 @@ async def upload_document_stream(
                 logger.info(f"Cleaned up temporary file: {file_path}")
             
             # Stage 8: Ready
-            yield f"data: {json.dumps({'stage': 'ready', 'progress': 100, 'document': {'id': file_id, 'name': file.filename, 'size': size, 'uploadedAt': datetime.now(datetime.UTC).isoformat(), 'contentType': file.content_type, 'chunks': total_chunks}})}\n\n"
+            yield f"data: {json.dumps({'stage': 'ready', 'progress': 100, 'document': {'id': file_id, 'name': file.filename, 'size': size, 'uploadedAt': datetime.now(timezone.utc).isoformat(), 'contentType': file.content_type, 'chunks': total_chunks}})}\n\n"
             
         except HTTPException as e:
             logger.exception("Upload streaming failed with HTTPException")
