@@ -234,9 +234,9 @@ async def chat_stream(
                 session.commit()
                 logger.debug(f"Saved assistant response to database (chat: {payload.chatId})")
                 
-                # Auto-generate title after 2 messages (user + assistant = first exchange)
+                # Auto-generate title after 4 messages (2 complete exchanges: user+assistant, user+assistant)
                 if len(chat.messages) == 4 and chat.title == "New Chat":
-                    logger.info(f"Auto-triggering title generation for chat {payload.chatId} (2 messages)")
+                    logger.info(f"[Title Gen] Triggering title generation for chat {payload.chatId} (4 messages)")
                     # Fire and forget background task
                     asyncio.create_task(generate_title_background(payload.chatId, openai_client))
                     

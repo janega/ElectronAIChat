@@ -357,6 +357,8 @@ function AppContent() {
                 if (updatedChat.title !== 'New Chat') {
                   updateChat(streamChatId, { title: updatedChat.title });
                   console.log('[Title Check] ✅ Updated title:', updatedChat.title);
+                } else {
+                  console.log('[Title Check] ⏳ Title not ready yet (will check on next message)');
                 }
               } catch (error) {
                 console.error('[Title Check] ❌ Failed to fetch title:', error);

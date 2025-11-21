@@ -19,16 +19,17 @@ async def generate_title_background(chat_id: str, openai_client: OpenAIClient):
     """Background task to generate chat title based on conversation history."""
     session = None
     try:
+        logger.info(f"[Title Gen] Starting title generation for chat {chat_id}")
         session = next(get_session())
         chat = session.get(Chat, chat_id)
         
         if not chat or len(chat.messages) < 2:
-            logger.debug(f"Skip title generation for chat {chat_id}: insufficient messages")
+            logger.debug(f"[Title Gen] Skip for chat {chat_id}: insufficient messages (found {len(chat.messages) if chat else 0})")
             return
         
         # Only generate if still using default title
         if chat.title != "New Chat":
-            logger.debug(f"Skip title generation for chat {chat_id}: title already set")
+            logger.debug(f"[Title Gen] Skip for chat {chat_id}: title already set to '{chat.title}'")
             return
         
         # Build conversation context (limit to first 4 messages for speed)
@@ -72,10 +73,10 @@ Title:"""
         session.add(chat)
         session.commit()
         
-        logger.info(f"Generated title for chat {chat_id}: {title}")
+        logger.info(f"[Title Gen] ✅ Successfully saved title for chat {chat_id}: '{title}'")
         
     except Exception as e:
-        logger.exception(f"Title generation failed for chat {chat_id}")
+        logger.exception(f"[Title Gen] ❌ Failed for chat {chat_id}")
         if session:
             session.rollback()
     finally:
