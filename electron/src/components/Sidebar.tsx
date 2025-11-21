@@ -10,6 +10,7 @@ interface SidebarProps {
   onNewChat: () => void;
   onDeleteChat: (chatId: string) => void;
   isDark: boolean;
+  isCreatingChat?: boolean;
 }
 
 export function Sidebar({
@@ -20,6 +21,7 @@ export function Sidebar({
   onNewChat,
   onDeleteChat,
   isDark,
+  isCreatingChat = false,
 }: SidebarProps) {
   const [sidebarWidth, setSidebarWidth] = useState(256); // 16rem = 256px (w-64)
   const [isResizing, setIsResizing] = useState(false);
@@ -77,10 +79,24 @@ export function Sidebar({
       <div className="p-4 border-b border-gray-200 dark:border-gray-800">
         <button
           onClick={onNewChat}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
+          disabled={isCreatingChat}
+          className={`w-full px-4 py-2 rounded-lg transition flex items-center justify-center gap-2 ${
+            isCreatingChat
+              ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
         >
-          <Plus size={18} />
-          New Chat
+          {isCreatingChat ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Creating...
+            </>
+          ) : (
+            <>
+              <Plus size={18} />
+              New Chat
+            </>
+          )}
         </button>
       </div>
 

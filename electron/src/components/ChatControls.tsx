@@ -1,11 +1,13 @@
 import React from 'react';
-import { Upload, Maximize2, Minimize2, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { Upload, Maximize2, Minimize2, CheckCircle, XCircle, Loader, Brain } from 'lucide-react';
 import { DocumentWithStatus } from '../types';
 
 interface ChatControlsProps {
   uploadedDocs: DocumentWithStatus[];
   searchMode: string;
   onSearchModeChange: (mode: string) => void;
+  useMemory: boolean;
+  onUseMemoryChange: (enabled: boolean) => void;
   onUpload: (files: FileList) => void;
   isLoading: boolean;
   isExpanded: boolean;
@@ -16,6 +18,8 @@ export function ChatControls({
   uploadedDocs,
   searchMode,
   onSearchModeChange,
+  useMemory,
+  onUseMemoryChange,
   onUpload,
   isLoading,
   isExpanded,
@@ -23,16 +27,18 @@ export function ChatControls({
 }: ChatControlsProps) {
   return (
     <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-4 flex items-center gap-3">
-      <label className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer transition">
-        <Upload size={18} />
-        <span className="text-sm">Upload</span>
+      <label className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer transition"
+      title="Upload document(s)">
+        <Upload size={18} />        
+        {/* <span className="text-sm"></span> */}
         <input
           type="file"
           multiple
           onChange={(e) => e.target.files && onUpload(e.target.files)}
           accept=".pdf,.txt,.md,.docx"
           className="hidden"
-          disabled={isLoading}
+          disabled={isLoading}          
+          aria-label='Upload document(s)'
         />
       </label>
 
@@ -68,6 +74,19 @@ export function ChatControls({
           })}
         </div>
       )}
+
+      <button
+        onClick={() => onUseMemoryChange(!useMemory)}
+        className={`p-2 rounded-lg transition flex items-center gap-1.5 ${
+          useMemory
+            ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
+        }`}
+        title={useMemory ? 'Memory enabled - AI will remember context' : 'Memory disabled'}
+      >
+        <Brain size={18} />
+        <span className="text-xs font-medium">{useMemory ? 'ON' : 'OFF'}</span>
+      </button>
 
       <select
         value={searchMode}

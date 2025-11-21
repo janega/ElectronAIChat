@@ -9,6 +9,7 @@ export interface Message {
   sources?: Array<{         // Document sources used in RAG
     filename: string;
     chatId?: string;
+    type?: 'document' | 'memory';  // Type of source
   }>;
   modelUsed?: string;       // Model used for generation
   tokensUsed?: number;      // Total tokens consumed
@@ -72,7 +73,7 @@ export interface StreamChunk {
   token?: string;
   content?: string;
   done?: boolean;
-  sources?: Array<{filename: string; chatId?: string}>;
+  sources?: Array<{filename: string; chatId?: string; type?: 'document' | 'memory'}>;
 }
 
 export type PageType = 'chat' | 'settings';

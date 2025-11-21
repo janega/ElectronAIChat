@@ -118,50 +118,46 @@ export function useChatHistory(userId?: string) {
   }, [chats, userId]);
 
   const createNewChat = async (): Promise<Chat> => {
-    // Create temporary local chat immediately for instant UI
-    const tempId = `local-${crypto.randomUUID()}`;
-    const newChat: Chat = {
-      id: tempId,
-      title: 'New Chat',
-      messages: [],
-      documents: [],
-      searchMode: 'normal',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isSynced: false,
-    };
-    
-    setChats((prev) => [newChat, ...prev]);
-    setCurrentChatId(tempId);
-
-    // Sync to backend in background
-    if (userId) {
-      try {
-        console.log('[createNewChat] Syncing to backend with userId:', userId);
-        const backendChat = await apiClient.createChat(userId, newChat.title);
-        console.log('[createNewChat] Backend response:', backendChat);
-        
-        // Update chat with server ID
-        setChats((prev) =>
-          prev.map((c) =>
-            c.id === tempId
-              ? {
-                  ...c,
-                  serverChatId: backendChat.id,
-                  isSynced: true,
-                  createdAt: backendChat.created_at,
-                  updatedAt: backendChat.updated_at,
-                }
-              : c
-          )
-        );
-      } catch (error) {
-        console.error('Failed to sync new chat to backend:', error);
-        // Chat remains local-only with isSynced: false
-      }
+    // CRITICAL: If userId not available, don't create chat
+    if (!userId) {
+      console.error('[createNewChat] Cannot create chat without userId');
+      throw new Error('User must be initialized before creating chat');
     }
 
-    return newChat;
+    try {
+      console.log('[createNewChat] Creating chat in backend first...');
+      
+      // 1. Create chat in backend FIRST (synchronous)
+      const backendChat = await apiClient.createChat(userId, 'New Chat');
+      console.log('[createNewChat] Backend chat created:', backendChat);
+      
+      // 2. Create local chat with backend ID (already synced)
+      const newChat: Chat = {
+        id: backendChat.id,           // Use backend ID as primary ID
+        serverChatId: backendChat.id,  // Store backend reference
+        title: backendChat.title,
+        messages: [],
+        documents: [],
+        searchMode: backendChat.search_mode || 'normal',
+        createdAt: backendChat.created_at,
+        updatedAt: backendChat.updated_at,
+        isSynced: true,                // Already synced!
+      };
+      
+      // 3. Update local state
+      setChats((prev) => [newChat, ...prev]);
+      setCurrentChatId(newChat.id);
+      
+      console.log('[createNewChat] Chat created successfully:', newChat.id);
+      return newChat;
+      
+    } catch (error) {
+      console.error('[createNewChat] Failed to create chat:', error);
+      
+      // Show user-friendly error
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to create chat: ${errorMsg}`);
+    }
   };
 
   const updateChat = async (chatId: string, updates: Partial<Chat>) => {

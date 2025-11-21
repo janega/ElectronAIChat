@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Message } from '../types';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { RefreshCw, AlertCircle, FileText, Brain } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
@@ -11,6 +11,18 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, isDark, onRetry }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const hasError = message.error || (message.content.startsWith('Error:') && message.role === 'assistant');
+
+  // Debug logging for sources
+  useEffect(() => {
+    if (message.role === 'assistant') {
+      console.log('[MessageBubble] Rendering message:', {
+        id: message.id,
+        hasSources: !!message.sources,
+        sourcesLength: message.sources?.length,
+        sources: message.sources,
+      });
+    }
+  }, [message]);
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -32,19 +44,28 @@ export function MessageBubble({ message, isDark, onRetry }: MessageBubbleProps) 
           <div className={`mt-2 pt-2 border-t ${isDark ? 'border-gray-700' : 'border-gray-300'}`}>
             <p className="text-xs font-medium opacity-70 mb-1">Sources:</p>
             <div className="flex flex-wrap gap-1">
-              {message.sources.map((source, idx) => (
-                <span
-                  key={idx}
-                  className={`text-xs px-2 py-0.5 rounded ${
-                    isDark 
-                      ? 'bg-gray-700 text-gray-300' 
-                      : 'bg-gray-300 text-gray-700'
-                  }`}
-                  title={`Document used for context: ${source.filename}`}
-                >
-                  {source.filename}
-                </span>
-              ))}
+              {message.sources.map((source, idx) => {
+                const isMemory = source.type === 'memory';
+                const Icon = isMemory ? Brain : FileText;
+                const tooltipText = isMemory 
+                  ? 'Retrieved from long-term memory' 
+                  : `Document: ${source.filename}`;
+                
+                return (
+                  <span
+                    key={idx}
+                    className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                      isDark 
+                        ? 'bg-gray-700 text-gray-300' 
+                        : 'bg-gray-300 text-gray-700'
+                    }`}
+                    title={tooltipText}
+                  >
+                    <Icon size={12} />
+                    <span>{source.filename}</span>
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

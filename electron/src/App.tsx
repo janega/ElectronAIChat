@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Menu, X, Settings, Plus, Sun, Moon, Wifi, WifiOff } from 'lucide-react';
+import { Menu, X, Settings, Plus, Sun, Moon, Wifi, WifiOff, Loader2 } from 'lucide-react';
 import { PageType, DocumentWithStatus, Message } from './types';
 import { useTheme, useSettings, useChatHistory, useChat } from './hooks';
 import { apiClient } from './utils/api';
@@ -51,10 +51,12 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [uploadedDocs, setUploadedDocs] = useState<DocumentWithStatus[]>([]);
   const [searchMode, setSearchMode] = useState('normal');
+  const [useMemory, setUseMemory] = useState(true);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [backendConnected, setBackendConnected] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null!);
 
@@ -213,6 +215,7 @@ function AppContent() {
       backendChatId,
       userId!,
       searchMode,
+      useMemory,
       uploadedDocs.map((d) => d.id),
       settings,
       false, // skipUserMessage
@@ -255,6 +258,23 @@ function AppContent() {
 
     // Note: isStreaming will be cleared by the effect watching isLoading
     // messages state will be updated by useChat hook
+  };
+
+  const handleNewChat = async () => {
+    if (!userId) {
+      alert('Please set your username first');
+      return;
+    }
+
+    setIsCreatingChat(true);
+    try {
+      await createNewChat();
+    } catch (error) {
+      console.error('[App] Failed to create chat:', error);
+      alert(`Failed to create chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsCreatingChat(false);
+    }
   };
 
   const handleSelectChat = (chatId: string) => {
@@ -300,6 +320,7 @@ function AppContent() {
       backendChatId,
       userId!,
       searchMode,
+      useMemory,
       uploadedDocs.map((d) => d.id),
       settings,
       true, // skipUserMessage = true for retry
@@ -480,9 +501,10 @@ function AppContent() {
           chats={chats}
           currentChatId={currentChatId}
           onSelectChat={handleSelectChat}
-          onNewChat={createNewChat}
+          onNewChat={handleNewChat}
           onDeleteChat={deleteChat}
           isDark={isDark}
+          isCreatingChat={isCreatingChat}
         />
 
         <div className="flex-1 flex flex-col">
@@ -540,6 +562,8 @@ function AppContent() {
                   setSearchMode(mode);
                   updateChat(currentChatId, { searchMode: mode as any });
                 }}
+                useMemory={useMemory}
+                onUseMemoryChange={setUseMemory}
                 onUpload={handleUploadDocument}
                 isLoading={isLoading}
                 isExpanded={isInputExpanded}
@@ -561,11 +585,25 @@ function AppContent() {
                   Start a new conversation or select one from the sidebar.
                 </p>
                 <button
-                  onClick={() => createNewChat()}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 mx-auto"
+                  onClick={handleNewChat}
+                  disabled={isCreatingChat}
+                  className={`px-6 py-3 rounded-lg transition flex items-center gap-2 mx-auto ${
+                    isCreatingChat
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
                 >
-                  <Plus size={20} />
-                  New Chat
+                  {isCreatingChat ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={20} />
+                      New Chat
+                    </>
+                  )}
                 </button>
               </div>
             </div>

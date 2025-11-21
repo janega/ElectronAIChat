@@ -16,6 +16,7 @@ export function useChat() {
       chatId: string,
       userId: string,
       searchMode: string,
+      useMemory: boolean,
       documentIds: string[],
       settings: AppSettings,
       skipUserMessage = false, // Skip adding user message for retry scenarios
@@ -41,7 +42,7 @@ export function useChat() {
           temperature: settings.temperature,
           maxTokens: settings.maxTokens,
           systemPrompt: settings.systemPrompt,
-          useMemory: true,
+          useMemory: useMemory,
         };
 
         if (cleanupRef.current) {
@@ -54,9 +55,15 @@ export function useChat() {
           (chunk) => {
             fullResponse += chunk.token || chunk.content || '';
             
-            // Capture sources from final chunk (when done=true)
+            // Log all done chunks for debugging
+            if (chunk.done) {
+              console.log('[useChat] Final chunk received:', JSON.stringify(chunk));
+              console.log('[useChat] Sources in chunk:', chunk.sources);
+            }
+            
+            // Handle final chunk with sources
             if (chunk.done && chunk.sources) {
-              // Store sources to attach to final message
+              console.log('[useChat] Attaching sources to message:', chunk.sources);
               const aiMessage: Message = {
                 id: aiMessageId,
                 role: 'assistant',
@@ -66,10 +73,21 @@ export function useChat() {
               };
               
               if (aiMessageAdded) {
-                // Update existing message with sources
-                onStreamUpdate?.(chatId, aiMessage, false);
+                // Update existing message with sources AND mark as done
+                console.log('[useChat] Updating message with sources (final)');
+                onStreamUpdate?.(chatId, aiMessage, true);
+              } else {
+                // Edge case: sources arrived but no message was added yet
+                console.log('[useChat] Creating message with sources (final)');
+                onStreamUpdate?.(chatId, aiMessage, true);
+                aiMessageAdded = true;
               }
               return; // Don't process further for done event
+            }
+            
+            // Skip processing if stream is done (without sources)
+            if (chunk.done) {
+              return;
             }
             
             // Build AI message as stream progresses

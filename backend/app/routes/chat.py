@@ -106,12 +106,14 @@ async def chat_stream(
             sources = []  # Track document sources for RAG attribution
             if payload.searchMode in ["embeddings", "all"]:
                 try:
+                    logger.info(f"Querying ChromaDB for chat_id={payload.chatId}, searchMode={payload.searchMode}")
                     search_results = await langchain_manager.search_documents(
                         chat_id=payload.chatId, 
                         query=payload.message, 
                         k=3
                     )
                     if search_results:
+                        logger.info(f"Found {len(search_results)} RAG documents from ChromaDB")
                         doc_context = "\n\n--- Relevant Documents ---\n"
                         for result in search_results:
                             doc_context += f"\n{result['content']}\n"
@@ -122,16 +124,24 @@ async def chat_stream(
                             if filename not in [s['filename'] for s in sources]:
                                 sources.append({
                                     'filename': filename,
-                                    'chatId': result['metadata'].get('chatId', payload.chatId)
+                                    'chatId': result['metadata'].get('chatId', payload.chatId),
+                                    'type': 'document'
                                 })
+                                logger.debug(f"Added document source: {filename}")
+                        logger.info(f"Document sources collected: {[s['filename'] for s in sources]}")
+                    else:
+                        logger.info("ChromaDB search returned no documents")
                 except Exception:
                     logger.exception("Document search failed - continuing without RAG context")
+            else:
+                logger.info(f"Skipping ChromaDB query (searchMode={payload.searchMode})")
 
             # 2. Retrieve user memory context
             mem0_context = ""
+            memory_used = False
             if payload.useMemory:
                 try:
-                    logger.debug(f"Retrieving memories for user={payload.userId}")
+                    logger.info(f"Querying Mem0 for user_id={payload.userId}")
                     relevant_memories = mem0_manager.search_memory(
                         user_id=payload.userId, 
                         query=payload.message, 
@@ -146,16 +156,19 @@ async def chat_stream(
                         memories_list = relevant_memories
                     
                     if memories_list:
-                        logger.info(f"Found {len(memories_list)} memories")
+                        logger.info(f"Found {len(memories_list)} Mem0 memories")
                         mem0_context = "\n\n--- User Memory Context ---\n"
                         for mem in memories_list:
                             if isinstance(mem, dict) and "memory" in mem:
                                 mem0_context += f"- {mem['memory']}\n"
                         logger.info(f"Memory context built: {mem0_context[:200]}")
+                        memory_used = True
                     else:
-                        logger.info(f"No memories found for user={payload.userId}")
+                        logger.info(f"Mem0 search returned no memories for user={payload.userId}")
                 except Exception:
                     logger.exception("Memory search failed - continuing without memory context")
+            else:
+                logger.info(f"Skipping Mem0 query (useMemory={payload.useMemory})")
 
             # 3. Build conversation messages with context
             messages = [{"role": "system", "content": payload.systemPrompt}]
@@ -188,10 +201,21 @@ async def chat_stream(
                 if chunk.get("done"):
                     break
             
+            # Add memory source if memories were used
+            if memory_used:
+                sources.append({
+                    'filename': 'Long-term Memory',
+                    'chatId': payload.chatId,
+                    'type': 'memory'
+                })
+            
             # Send final event with sources
             if sources:
+                logger.info(f"Sending {len(sources)} sources: {sources}")
                 final_data = json.dumps({"token": "", "done": True, "sources": sources})
                 yield f"data: {final_data}\n\n"
+            else:
+                yield f"data: {json.dumps({'token': '', 'done': True})}\n\n"
 
             # Log the accumulated response for debugging
             logger.info(f"Chat complete: user_message_length={len(payload.message)}, response_length={len(full_response)}, response_preview='{full_response[:100]}'")

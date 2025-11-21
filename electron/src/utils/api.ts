@@ -53,7 +53,7 @@ export class ApiClient {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-
+        
         const readStream = () => {
           reader
             .read()
@@ -74,10 +74,6 @@ export class ApiClient {
                 if (line.startsWith('data: ')) {
                   try {
                     const chunk = JSON.parse(line.slice(6)) as StreamChunk;
-                    if (chunk.done) {
-                      if (onComplete) onComplete();
-                      return;
-                    }
                     onChunk(chunk);
                   } catch (e) {
                     console.warn('Failed to parse SSE chunk:', line);
