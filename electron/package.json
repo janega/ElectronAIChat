@@ -32,7 +32,6 @@
     "icon": "assets/icons/app_icon",
     "files": [
       "dist/**/*",
-      "node_modules/**/*",
       "package.json",
       "assets/**/*"
     ],
