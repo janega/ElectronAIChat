@@ -27,7 +27,6 @@ async def upload_document(
     chatId: str = Form(...),
     userId: str = Form(...),
     langchain_manager: LangChainManager = None,
-    mem0_manager: Mem0Manager = None,
     session: DBSession = None
 ):
     """
@@ -36,8 +35,7 @@ async def upload_document(
     Process:
     1. Validate file size and type
     2. Extract text content (PDF with OCR fallback, JSON, plain text)
-    3. Generate embeddings and store in ChromaDB
-    4. Create memory record of upload event
+    3. Generate embeddings and store in ChromaDB    
     5. Clean up temporary files (per security requirement)
     
     Args:
@@ -153,22 +151,7 @@ async def upload_document(
             logger.exception("Failed to save document metadata - continuing")
             # Don't fail upload if metadata storage fails
 
-        # 7. Record upload event in user memory
-        try:
-            mem0_manager.add_message(
-                user_id=userId,
-                message=f"Uploaded document: {file.filename}",
-                role="system",
-                metadata={
-                    "doc_id": file_id, 
-                    "chat_id": chatId, 
-                    "action": "document_upload"
-                }
-            )
-        except Exception:
-            logger.exception("Failed to record upload in memory - continuing")
-
-        # 8. Clean up temporary file (security requirement)
+        # 7. Clean up temporary file (security requirement)
         try:
             if file_path.exists():
                 file_path.unlink()
@@ -204,7 +187,6 @@ async def upload_document_stream(
     chatId: str = Form(...),
     userId: str = Form(...),
     langchain_manager: LangChainManager = None,
-    mem0_manager: Mem0Manager = None,
     session: DBSession = None
 ):
     """
@@ -359,23 +341,8 @@ async def upload_document_stream(
                 logger.info(f"Saved document metadata: {file.filename} (ID: {file_id})")
             except Exception as e:
                 session.rollback()
-                logger.exception("Failed to save document metadata - continuing")
-            
-            # Record upload event in user memory
-            try:
-                mem0_manager.add_message(
-                    user_id=userId,
-                    message=f"Uploaded document: {file.filename}",
-                    role="system",
-                    metadata={
-                        "doc_id": file_id,
-                        "chat_id": chatId,
-                        "action": "document_upload"
-                    }
-                )
-            except Exception:
-                logger.exception("Failed to record upload in memory - continuing")
-            
+                logger.exception("Failed to save document metadata - continuing")         
+              
             # Clean up temporary file
             if file_path and file_path.exists():
                 file_path.unlink()
