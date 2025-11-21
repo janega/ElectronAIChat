@@ -2,14 +2,8 @@
 import os
 from pathlib import Path
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
-
-# Basic logging
-logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-)
-logger = logging.getLogger("chat_backend")
 
 # Provider configuration
 PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
@@ -48,10 +42,88 @@ USE_APP_DATA_DIR = IS_PACKAGED or os.getenv("USE_APP_DATA_DIR", "false").lower()
 
 if USE_APP_DATA_DIR:
     BASE_DIR = get_app_data_dir()
-    logger.info(f"Using app data directory: {BASE_DIR}")
 else:
     BASE_DIR = Path(os.getenv("BASE_DIR", "."))
-    logger.info(f"Using local directory: {BASE_DIR}")
+
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+
+# Create logs directory
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+def setup_logging(log_level: str = "INFO"):
+    """
+    Configure application logging with file rotation.
+    
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    """
+    # Clear any existing handlers
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    
+    # Set base log level
+    root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
+    
+    # Create formatters
+    detailed_formatter = logging.Formatter(
+        fmt='%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    console_formatter = logging.Formatter(
+        fmt='%(asctime)s | %(levelname)-8s | %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    
+    # Console handler (less verbose for terminal readability)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
+    
+    # Main application log file (rotating, 5 MB per file, 20 backups = 100 MB total)
+    app_log_file = LOGS_DIR / "app.log"
+    file_handler = RotatingFileHandler(
+        filename=app_log_file,
+        maxBytes=5 * 1024 * 1024,  # 5 MB
+        backupCount=20,
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)  # Capture everything in file
+    file_handler.setFormatter(detailed_formatter)
+    root_logger.addHandler(file_handler)
+    
+    # Separate error log (rotating, 5 MB per file, 10 backups = 50 MB total)
+    error_log_file = LOGS_DIR / "error.log"
+    error_handler = RotatingFileHandler(
+        filename=error_log_file,
+        maxBytes=5 * 1024 * 1024,  # 5 MB
+        backupCount=10,
+        encoding='utf-8'
+    )
+    error_handler.setLevel(logging.ERROR)
+    error_handler.setFormatter(detailed_formatter)
+    root_logger.addHandler(error_handler)
+    
+    # Log startup message
+    logger = logging.getLogger(__name__)
+    logger.info("=" * 80)
+    logger.info("ElectronAIChat Backend Logging Initialized")
+    logger.info(f"Log Level: {log_level}")
+    logger.info(f"Base Directory: {BASE_DIR}")
+    logger.info(f"Log Directory: {LOGS_DIR}")
+    logger.info(f"App Log: {app_log_file}")
+    logger.info(f"Error Log: {error_log_file}")
+    logger.info("=" * 80)
+
+# Initialize logging (can be overridden by environment variable)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+setup_logging(LOG_LEVEL)
+
+logger = logging.getLogger(__name__)
 
 # Upload and persistence directories
 UPLOAD_DIR = (BASE_DIR / "uploads")

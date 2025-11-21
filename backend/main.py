@@ -11,6 +11,7 @@ Enhanced from original with:
 - JSON file processing
 """
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +20,10 @@ from dotenv import load_dotenv
 
 from app.config import (
     APP_NAME, PROVIDER, OLLAMA_HOST, OPENAI_API_KEY, 
-    ALLOW_ORIGINS, DATABASE_PATH, logger as cfg_logger
+    ALLOW_ORIGINS, DATABASE_PATH, BASE_DIR, LOGS_DIR, IS_PACKAGED,
+    DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OPENAI_LLM_MODEL,
+    DEFAULT_OLLAMA_EMBED_MODEL, DEFAULT_OPENAI_EMBED_MODEL,
+    logger as cfg_logger
 )
 from app.embeddings import LangChainEmbeddingManager
 from app.memory import Mem0MemoryManager
@@ -40,11 +44,79 @@ load_dotenv()
 # Use the logger from config
 logger = cfg_logger
 
-# Initialize FastAPI application
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Manage application lifecycle events (startup/shutdown).
+    Replaces deprecated @app.on_event decorators.
+    """
+    # Startup: Initialize database and managers
+    logger.info("=" * 80)
+    logger.info("ElectronAIChat Backend Starting")
+    logger.info(f"Packaged: {IS_PACKAGED}")
+    logger.info(f"Base Directory: {BASE_DIR}")
+    logger.info(f"Logs Directory: {LOGS_DIR}")
+    logger.info(f"LLM Provider: {PROVIDER}")
+    
+    if PROVIDER == "ollama":
+        logger.info(f"Ollama Host: {OLLAMA_HOST}")
+        logger.info(f"Ollama LLM Model: {DEFAULT_OLLAMA_LLM_MODEL}")
+        logger.info(f"Ollama Embed Model: {DEFAULT_OLLAMA_EMBED_MODEL}")
+    else:
+        logger.info(f"OpenAI LLM Model: {DEFAULT_OPENAI_LLM_MODEL}")
+        logger.info(f"OpenAI Embed Model: {DEFAULT_OPENAI_EMBED_MODEL}")
+    
+    logger.info(f"Database: {DATABASE_PATH}")
+    logger.info(f"ChromaDB: {BASE_DIR / 'chroma_db'}")
+    logger.info(f"Upload Directory: {BASE_DIR / 'uploads'}")
+    
+    # Initialize database (create tables on startup)
+    create_db_and_tables()
+    
+    # Initialize shared managers (single instances)
+    langchain_manager = LangChainEmbeddingManager(provider=PROVIDER)
+    mem0_manager = Mem0MemoryManager()
+    
+    # Initialize OpenAI client based on provider
+    if PROVIDER == "ollama":
+        openai_client = EnhancedOpenAIClient(
+            base_url=OLLAMA_HOST,
+            api_key="ollama",
+            provider="ollama"
+        )
+    else:
+        openai_client = EnhancedOpenAIClient(
+            base_url="https://api.openai.com/v1",
+            api_key=OPENAI_API_KEY,
+            provider="openai"
+        )
+    
+    # Set up dependency injection for managers
+    dependencies.set_managers(
+        langchain_manager=langchain_manager,
+        mem0_manager=mem0_manager,
+        openai_client=openai_client
+    )
+    
+    logger.info("All managers initialized successfully")
+    logger.info("=" * 80)
+    
+    # Yield control to application (runs while app is active)
+    yield
+    
+    # Shutdown: Cleanup resources
+    logger.info("=" * 80)
+    logger.info("ElectronAIChat Backend Shutting Down")
+    logger.info("=" * 80)
+
+
+# Initialize FastAPI application with lifespan handler
 app = FastAPI(
     title=APP_NAME,
     description="Chat backend with RAG, ChromaDB vector storage, and memory integration",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
 # Configure CORS middleware
@@ -54,34 +126,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-# Initialize database (create tables on startup)
-create_db_and_tables()
-
-# Initialize shared managers (single instances)
-langchain_manager = LangChainEmbeddingManager(provider=PROVIDER)
-mem0_manager = Mem0MemoryManager()
-
-# Initialize OpenAI client based on provider
-if PROVIDER == "ollama":
-    openai_client = EnhancedOpenAIClient(
-        base_url=OLLAMA_HOST,
-        api_key="ollama",
-        provider="ollama"
-    )
-else:
-    openai_client = EnhancedOpenAIClient(
-        base_url="https://api.openai.com/v1",
-        api_key=OPENAI_API_KEY,
-        provider="openai"
-    )
-
-# Set up dependency injection for managers
-dependencies.set_managers(
-    langchain_manager=langchain_manager,
-    mem0_manager=mem0_manager,
-    openai_client=openai_client
 )
 
 # Register route modules
@@ -139,15 +183,8 @@ async def root():
 
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print(APP_NAME)
-    print(f"Embeddings: LangChain ({PROVIDER})")
-    print("Memory: Mem0 with MemoryStub fallback")
-    print("Vector Store: ChromaDB")
-    print(f"Database: {DATABASE_PATH}")
-    print("OCR Support: Enabled (Tesseract)")
-    print("JSON Processing: Enabled")
-    print("=" * 60)
+    logger.info("Starting FastAPI server on http://127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)
-    #uvicorn.run("main.app", host="127.0.0.1", port=8000, reload=True)
+    # For development with hot reload:
+    # uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
 
