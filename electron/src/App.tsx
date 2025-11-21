@@ -236,21 +236,26 @@ function AppContent() {
           console.log('[Stream Update] Stream completed for chat:', streamChatId);
           updateChat(streamChatId, { isStreaming: false });
           
-          // Check for title update after 2 messages (backend auto-generates)
+          // Check for title update after EVERY message if still "New Chat"
+          // Backend generates title after 4 messages (2 exchanges)
           const chat = chats.find(c => c.id === streamChatId);
-          if (chat?.messages.length === 2 && chat.title === 'New Chat' && chat.serverChatId) {
-            // Poll for title update after a delay (backend needs time to generate)
+          if (chat?.title === 'New Chat' && chat.serverChatId) {
+            console.log('[Title Check] Polling for title update (current: "New Chat")');
+            
+            // Single poll after 2.5s delay - if not ready, next message will catch it
             setTimeout(async () => {
               try {
                 const updatedChat = await apiClient.getChatDetail(chat.serverChatId!);
                 if (updatedChat.title !== 'New Chat') {
                   updateChat(streamChatId, { title: updatedChat.title });
-                  console.log('[Title Update] Received new title:', updatedChat.title);
+                  console.log('[Title Check] ✅ Updated title:', updatedChat.title);
+                } else {
+                  console.log('[Title Check] ⏳ Title not ready yet (will check on next message)');
                 }
               } catch (error) {
-                console.error('[Title Update] Failed to fetch title:', error);
+                console.error('[Title Check] ❌ Failed to fetch title:', error);
               }
-            }, 4000); // Wait 4 seconds for backend title generation
+            }, 2500); // 2.5 second delay for backend title generation
           }
         }
       }
@@ -340,6 +345,24 @@ function AppContent() {
         if (isDone) {
           console.log('[Retry Stream Update] Stream completed for chat:', streamChatId);
           updateChat(streamChatId, { isStreaming: false });
+          
+          // Check for title update (same logic as regular send)
+          const chat = chats.find(c => c.id === streamChatId);
+          if (chat?.title === 'New Chat' && chat.serverChatId) {
+            console.log('[Title Check] Polling for title update after retry');
+            
+            setTimeout(async () => {
+              try {
+                const updatedChat = await apiClient.getChatDetail(chat.serverChatId!);
+                if (updatedChat.title !== 'New Chat') {
+                  updateChat(streamChatId, { title: updatedChat.title });
+                  console.log('[Title Check] ✅ Updated title:', updatedChat.title);
+                }
+              } catch (error) {
+                console.error('[Title Check] ❌ Failed to fetch title:', error);
+              }
+            }, 2500);
+          }
         }
       }
     );
