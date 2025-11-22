@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AppSettings } from '../types';
 import { apiClient } from '../utils/api';
+import { Trash2, Loader2 } from 'lucide-react';
 
 interface SettingsPageProps {
   isDark: boolean;
@@ -27,6 +28,7 @@ export function SettingsPage({
     success: boolean;
     message: string;
   } | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   const handleTestBackend = async () => {
     setTestingBackend(true);
@@ -48,6 +50,64 @@ export function SettingsPage({
       });
     } finally {
       setTestingBackend(false);
+    }
+  };
+
+  const handleResetApplication = async () => {
+    // First confirmation
+    const firstConfirm = window.confirm(
+      '⚠️ WARNING: This will permanently delete:\n\n' +
+      '• All chats and messages\n' +
+      '• All uploaded documents\n' +
+      '• All settings and preferences\n' +
+      '• Long-term memory (Mem0)\n\n' +
+      'This action CANNOT be undone!\n\n' +
+      'Are you sure you want to continue?'
+    );
+
+    if (!firstConfirm) return;
+
+    // Second confirmation (extra safety)
+    const secondConfirm = window.confirm(
+      'FINAL CONFIRMATION:\n\n' +
+      'This will delete ALL your data from both your device and the backend.\n\n' +
+      'Click OK to proceed, or Cancel to abort.'
+    );
+
+    if (!secondConfirm) return;
+
+    setIsResetting(true);
+
+    try {
+      // 1. Tell backend to wipe its data
+      await apiClient.request('/api/admin/reset', { method: 'POST' });
+      
+      // 2. Clear all localStorage
+      localStorage.clear();
+      
+      // 3. Show success message before reload
+      alert('✅ Application reset complete. The app will now reload.');
+      
+      // 4. Reload app to force fresh start
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('[Settings] Reset failed:', error);
+      
+      const platform = navigator.platform.toLowerCase();
+      const dataPath = platform.includes('win')
+        ? '%APPDATA%\\ElectronAIChat'
+        : platform.includes('mac')
+        ? '~/Library/Application Support/ElectronAIChat'
+        : '~/.config/ElectronAIChat';
+      
+      alert(
+        `Failed to reset application:\n\n${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
+        'You may need to manually delete data from:\n' +
+        `• ${dataPath}`
+      );
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -232,7 +292,7 @@ export function SettingsPage({
           </div>
 
           {/* System Prompt */}
-          <div>
+          <div className="border-b border-gray-200 dark:border-gray-800 pb-8">
             <h2 className="text-xl font-semibold mb-6">System Prompt</h2>
 
             <textarea
@@ -247,6 +307,88 @@ export function SettingsPage({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               Define the behavior and personality of the AI assistant
             </p>
+          </div>
+
+          {/* Danger Zone */}
+          <div className="border-2 border-red-500 dark:border-red-700 rounded-lg p-6 bg-red-50 dark:bg-red-950/20">
+            <h2 className="text-xl font-semibold mb-4 text-red-600 dark:text-red-400 flex items-center gap-2">
+              <Trash2 size={24} />
+              Danger Zone
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-red-600 dark:text-red-400 mb-2">
+                  Reset Application
+                </h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                  Permanently delete all chats, messages, uploaded documents, and settings. 
+                  This will wipe both local cache and backend database.
+                </p>
+                <button
+                  onClick={handleResetApplication}
+                  disabled={isResetting || !backendConnected}
+                  className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                    isResetting || !backendConnected
+                      ? 'bg-gray-400 cursor-not-allowed text-white'
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
+                >
+                  {isResetting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={18} />
+                      Reset Application
+                    </>
+                  )}
+                </button>
+                
+                {!backendConnected && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                    ⚠️ Backend must be running to reset application data
+                  </p>
+                )}
+              </div>
+
+              {/* Data Location Info */}
+              <div className="text-xs text-gray-600 dark:text-gray-400 mt-4 p-3 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-800">
+                <p className="font-semibold mb-2">Application Data Locations:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Frontend Cache: Browser localStorage</li>
+                  <li>
+                    Backend Database: {
+                      navigator.platform.toLowerCase().includes('win')
+                        ? '%APPDATA%\\ElectronAIChat\\chat_history.db' 
+                        : navigator.platform.toLowerCase().includes('mac')
+                        ? '~/Library/Application Support/ElectronAIChat/chat_history.db'
+                        : '~/.config/ElectronAIChat/chat_history.db'
+                    }
+                  </li>
+                  <li>
+                    Document Embeddings: {
+                      navigator.platform.toLowerCase().includes('win')
+                        ? '%APPDATA%\\ElectronAIChat\\chroma_db\\'
+                        : navigator.platform.toLowerCase().includes('mac')
+                        ? '~/Library/Application Support/ElectronAIChat/chroma_db/'
+                        : '~/.config/ElectronAIChat/chroma_db/'
+                    }
+                  </li>
+                  <li>
+                    Memory Store: {
+                      navigator.platform.toLowerCase().includes('win')
+                        ? '%APPDATA%\\ElectronAIChat\\chroma_db\\mem0\\'
+                        : navigator.platform.toLowerCase().includes('mac')
+                        ? '~/Library/Application Support/ElectronAIChat/chroma_db/mem0/'
+                        : '~/.config/ElectronAIChat/chroma_db/mem0/'
+                    }
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>

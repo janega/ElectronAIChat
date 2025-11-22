@@ -37,6 +37,7 @@ from app.routes.chat import router as chat_router
 from app.routes.documents import router as documents_router
 from app.routes.chats import router as chats_router
 from app.routes.users import router as users_router
+from app.routes.admin import router as admin_router
 
 # Load environment variables
 load_dotenv()
@@ -134,6 +135,7 @@ app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(chats_router)
 app.include_router(users_router)
+app.include_router(admin_router)
 
 #TODO remove this endpoint later
 # Legacy status endpoint (for backward compatibility with Electron)
