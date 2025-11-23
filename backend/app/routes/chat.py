@@ -274,33 +274,33 @@ async def chat_stream(
                 async def store_memories_background():
                     """Background task to store memories without blocking response"""
                     try:
-                        # Store user message (with validation)
-                        if payload.message and payload.message.strip() and len(payload.message.strip()) >= 3:
-                            logger.debug(f"Storing user message: '{payload.message[:100]}'")
+                        # Store conversation pair - Mem0 analyzes full exchange for facts
+                        if payload.message and payload.message.strip() and full_response and full_response.strip():
+                            logger.debug(f"Storing conversation pair: user='{payload.message[:100]}', assistant='{full_response[:100]}'")
+                            
+                            # Mem0 expects messages array for context analysis
+                            conversation = [
+                                {"role": "user", "content": payload.message},
+                                {"role": "assistant", "content": full_response}
+                            ]
+                            
                             await run_in_threadpool(
-                                mem0_manager.add_message,
-                                user_id=payload.userId, 
-                                message=payload.message, 
-                                role="user",
+                                mem0_manager.add_conversation_pair,
+                                user_message=payload.message,
+                                assistant_message=full_response,
+                                user_id=payload.userId,
                                 metadata={"chat_id": payload.chatId}
                             )
-                            logger.info(f"Successfully stored user message in memory (chat: {payload.chatId})")
+                            logger.debug(f"Successfully stored conversation pair in memory (chat: {payload.chatId})")
                         else:
-                            logger.warning(f"Skipping user message storage: too short or empty")
-                        
-                        # Store assistant response (with validation)
-                        if full_response and full_response.strip() and len(full_response.strip()) >= 3:
-                            logger.debug(f"Storing assistant response: '{full_response[:100]}'")
-                            await run_in_threadpool(
-                                mem0_manager.add_message,
-                                user_id=payload.userId, 
-                                message=full_response,
-                                role="assistant", 
-                                metadata={"chat_id": payload.chatId}
-                            )
-                            logger.info(f"Successfully stored assistant response in memory (chat: {payload.chatId})")
+                            logger.warning(f"Skipping memory storage: messages too short or empty")
+                            
+                    except ValueError as e:
+                        # Mem0 raises ValueError when facts already known (deduplication)
+                        if "empty" in str(e).lower():
+                            logger.debug("Mem0 skipped storage (duplicate/NOOP) - all facts already known")
                         else:
-                            logger.warning(f"Skipping assistant response storage: too short or empty (length={len(full_response)})")
+                            logger.error(f"Memory storage ValueError: {str(e)}")
                     except Exception as mem_error:
                         logger.error(f"Memory storage failed for chat {payload.chatId}: {type(mem_error).__name__}: {str(mem_error)}")
                         logger.exception("Full memory storage error traceback:")

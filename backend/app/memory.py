@@ -56,6 +56,19 @@ class MemoryStub:
             return True
         return False
 
+    def add_conversation_pair(self, user_id: str, user_message: str, assistant_message: str, metadata: Optional[dict] = None):
+        """MemoryStub implementation of add_conversation_pair for fallback consistency"""
+        if not user_message or not user_message.strip() or len(user_message.strip()) < 3:
+            return None
+        if not assistant_message or not assistant_message.strip() or len(assistant_message.strip()) < 3:
+            return None
+        
+        conversation = [
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": assistant_message}
+        ]
+        return self.add(messages=conversation, user_id=user_id, metadata=metadata)
+
 class Mem0MemoryManager:
     def __init__(self):
         """
@@ -158,11 +171,11 @@ class Mem0MemoryManager:
             
             # Log mem0's response
             if result and isinstance(result, dict) and result.get('results'):
-                logger.info(f"mem0 add result: {len(result['results'])} memories added")
+                logger.debug(f"mem0 add result: {len(result['results'])} memories added")
             elif result and isinstance(result, dict) and 'results' in result and not result['results']:
                 logger.debug(f"mem0 returned empty results (all NOOPs - facts already known)")
             else:
-                logger.info(f"mem0 add result: {result}")
+                logger.debug(f"mem0 add result: {result}")
             return result
         except ValueError as e:
             # ValueError typically means empty embeddings - this is expected when mem0 deduplicates
@@ -177,11 +190,72 @@ class Mem0MemoryManager:
             # Silently continue - memory storage is not critical for chat functionality
             return None
 
+    def add_conversation_pair(self, user_id: str, user_message: str, assistant_message: str, metadata: Optional[Dict] = None):
+        """
+        Store a complete user-assistant conversation pair in memory.
+        Mem0 analyzes the full exchange for contextual fact extraction.
+        
+        Args:
+            user_id: Unique identifier for the user
+            user_message: The user's message content
+            assistant_message: The assistant's response content
+            metadata: Optional metadata (e.g., chat_id, timestamp)
+            
+        Returns:
+            mem0 result dict or None if validation fails or deduplication occurs
+        """
+        # Validate both messages upfront
+        if not user_message or not user_message.strip() or len(user_message.strip()) < 3:
+            logger.debug(f"Invalid user message for user {user_id}: too short or empty")
+            return None
+            
+        if not assistant_message or not assistant_message.strip() or len(assistant_message.strip()) < 3:
+            logger.debug(f"Invalid assistant message for user {user_id}: too short or empty")
+            return None
+
+        try:
+            logger.debug(f"Adding conversation pair for user={user_id}, user_msg='{user_message[:50]}...', assistant_msg='{assistant_message[:50]}...'")
+            
+            # Store conversation pair in single call
+            conversation = [
+                {"role": "user", "content": user_message},
+                {"role": "assistant", "content": assistant_message}
+            ]
+            
+            result = self.memory.add(
+                messages=conversation,
+                user_id=user_id,
+                metadata=metadata or {}
+            )
+            
+            # Log result at debug level
+            if result and isinstance(result, dict) and result.get('results'):
+                logger.debug(f"mem0 stored conversation pair: {len(result['results'])} memories extracted")
+            elif result and isinstance(result, dict) and 'results' in result and not result['results']:
+                logger.debug(f"mem0 returned empty results (facts already known)")
+            else:
+                logger.debug(f"mem0 conversation pair result: {result}")
+            
+            return result
+            
+        except ValueError as e:
+            # ValueError typically means empty embeddings - mem0's deduplication at work
+            error_msg = str(e)
+            if "empty" in error_msg.lower() or "embeddings" in error_msg.lower():
+                logger.debug(f"mem0 skipped conversation pair (duplicate/NOOP): {error_msg}")
+            else:
+                logger.warning(f"mem0 ValueError on conversation pair: {error_msg}")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Failed to add conversation pair: {type(e).__name__}: {str(e)}")
+            return None
+
     def search_memory(self, user_id: str, query: str, limit: int = 5):
         try:
             logger.debug(f"Searching memory for user={user_id}, query='{query[:100]}', limit={limit}")
             result = self.memory.search(query=query, user_id=user_id, limit=limit)
-            logger.info(f"mem0 search returned {len(result) if result else 0} results: {result}")
+            logger.debug(f"mem0 search returned {len(result) if result else 0} results")
             return result
         except Exception:
             logger.exception("Memory search failed")
