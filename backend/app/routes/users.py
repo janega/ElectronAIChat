@@ -6,9 +6,10 @@ Handles user creation and retrieval for the application.
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select
 
-from app.database import User, UserCreate, UserResponse, UserSettings
+from app.database import User, UserCreate, UserResponse, UserSettings, SettingsUpdate
 from app.routes.dependencies import DBSession
-from app.config import logger
+from app.config import logger, DEFAULT_SETTINGS
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -103,3 +104,75 @@ async def get_user_by_id(user_id: str, session: DBSession):
     except Exception as e:
         logger.exception("Failed to get user")
         raise HTTPException(status_code=500, detail=f"User retrieval failed: {str(e)}")
+
+
+@router.get("/{user_id}/settings", response_model=UserSettings)
+async def get_user_settings(user_id: str, session: DBSession):
+    """Get user settings by user ID."""
+    try:
+        # Query UserSettings by user_id
+        user_settings = session.exec(
+            select(UserSettings).where(UserSettings.user_id == user_id)
+        ).first()
+        
+        if not user_settings:
+            # Verify user exists
+            user = session.get(User, user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail=f"User with ID '{user_id}' not found")
+            
+            # Create default settings if missing (safety fallback)
+            logger.warning(f"UserSettings missing for user {user_id}, creating defaults")
+            user_settings = UserSettings(
+                user_id=user_id,
+                temperature=DEFAULT_SETTINGS["temperature"],
+                max_tokens=DEFAULT_SETTINGS["max_tokens"],
+                top_p=DEFAULT_SETTINGS["top_p"],
+                top_k=DEFAULT_SETTINGS["top_k"],
+                system_prompt=DEFAULT_SETTINGS["system_prompt"],
+                use_memory=DEFAULT_SETTINGS["use_memory"]
+            )
+            session.add(user_settings)
+            session.commit()
+            session.refresh(user_settings)
+        
+        return user_settings
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to get user settings")
+        raise HTTPException(status_code=500, detail=f"Settings retrieval failed: {str(e)}")
+
+
+@router.put("/{user_id}/settings", response_model=UserSettings)
+async def update_user_settings(user_id: str, settings_update: SettingsUpdate, session: DBSession):
+    """Update user settings by user ID."""
+    try:
+        # Query existing settings
+        user_settings = session.exec(
+            select(UserSettings).where(UserSettings.user_id == user_id)
+        ).first()
+        
+        if not user_settings:
+            raise HTTPException(status_code=404, detail=f"Settings not found for user '{user_id}'")
+        
+        # Update only provided fields (partial update)
+        update_data = settings_update.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(user_settings, key, value)
+        
+        # Update timestamp
+        user_settings.updated_at = datetime.now(timezone.utc)
+        
+        session.add(user_settings)
+        session.commit()
+        session.refresh(user_settings)
+        
+        logger.info(f"Updated settings for user {user_id}: {list(update_data.keys())}")
+        return user_settings
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.exception("Failed to update user settings")
+        raise HTTPException(status_code=500, detail=f"Settings update failed: {str(e)}")

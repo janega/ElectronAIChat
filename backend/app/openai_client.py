@@ -101,6 +101,8 @@ class EnhancedOpenAIClient:
         messages: List[dict],
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        top_p: float = 0.9,
+        top_k: int = 40,
         stream: bool = True,
         **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
@@ -112,6 +114,8 @@ class EnhancedOpenAIClient:
             messages: List of message dicts with 'role' and 'content'
             temperature: Creativity level (0.0-1.0)
             max_tokens: Maximum response length
+            top_p: Nucleus sampling parameter (0.0-1.0)
+            top_k: Token filtering parameter (Ollama only)
             stream: Whether to stream tokens
             **kwargs: Additional parameters
             
@@ -119,6 +123,25 @@ class EnhancedOpenAIClient:
             Dict with 'token' (str) and 'done' (bool) keys
         """
         try:
+            # Update LLM parameters dynamically for this request
+            self.llm.temperature = temperature
+            
+            if self.provider == "ollama":
+                # Ollama supports both top_p and top_k
+                self.llm.top_p = top_p
+                self.llm.top_k = top_k
+                logger.debug(f"Ollama params: temp={temperature}, top_p={top_p}, top_k={top_k}, max_tokens={max_tokens}")
+            elif self.provider == "openai":
+                # OpenAI only supports top_p, not top_k
+                self.llm.top_p = top_p
+                logger.debug(f"OpenAI params: temp={temperature}, top_p={top_p}, max_tokens={max_tokens} (top_k not supported)")
+            
+            # Set max_tokens (different attribute names for different providers)
+            if hasattr(self.llm, 'max_tokens'):
+                self.llm.max_tokens = max_tokens
+            elif hasattr(self.llm, 'num_predict'):
+                self.llm.num_predict = max_tokens  # Ollama uses num_predict
+            
             if stream:
                 # Use LangChain's astream method which yields AIMessageChunk objects
                 async for chunk in self.llm.astream(messages):

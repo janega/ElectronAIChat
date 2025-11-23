@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppSettings } from '../types';
 import { apiClient } from '../utils/api';
-import { Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2, Check, X } from 'lucide-react';
 
 interface SettingsPageProps {
   isDark: boolean;
@@ -13,6 +13,10 @@ interface SettingsPageProps {
   ) => void;
   onTestBackend?: () => Promise<void>;
   backendConnected?: boolean;
+  userId: string | null;
+  saveStatus: 'idle' | 'saving' | 'success' | 'error';
+  saveError: string | null;
+  onSaveSettings: () => void;
 }
 
 export function SettingsPage({
@@ -22,6 +26,10 @@ export function SettingsPage({
   onSettingChange,
   onTestBackend,
   backendConnected,
+  userId,
+  saveStatus,
+  saveError,
+  onSaveSettings,
 }: SettingsPageProps) {
   const [testingBackend, setTestingBackend] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -171,43 +179,6 @@ export function SettingsPage({
             </div>
           </div>
 
-          {/* Model Configuration */}
-          <div className="border-b border-gray-200 dark:border-gray-800 pb-8">
-            <h2 className="text-xl font-semibold mb-6">Model Configuration</h2>
-
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">Model</label>
-                <input
-                  type="text"
-                  value={settings.model}
-                  onChange={(e) => onSettingChange('model', e.target.value)}
-                  placeholder="e.g., mistral, neural-chat"
-                  className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Model name available on your Ollama instance
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Ollama Host
-                </label>
-                <input
-                  type="text"
-                  value={settings.ollamaHost}
-                  onChange={(e) => onSettingChange('ollamaHost', e.target.value)}
-                  placeholder="http://localhost:11434"
-                  className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Backend will use this to connect to Ollama
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Generation Parameters */}
           <div className="border-b border-gray-200 dark:border-gray-800 pb-8">
             <h2 className="text-xl font-semibold mb-6">Generation Parameters</h2>
@@ -307,6 +278,58 @@ export function SettingsPage({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               Define the behavior and personality of the AI assistant
             </p>
+          </div>
+
+          {/* Save Settings Button */}
+          <div className="border-b border-gray-200 dark:border-gray-800 pb-8">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={onSaveSettings}
+                disabled={saveStatus === 'saving' || !userId || !backendConnected}
+                className={`px-6 py-3 rounded-lg transition font-medium ${
+                  saveStatus === 'saving' || !userId || !backendConnected
+                    ? 'bg-gray-400 cursor-not-allowed text-white'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {saveStatus === 'saving' ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    Saving...
+                  </span>
+                ) : (
+                  'Save Settings'
+                )}
+              </button>
+
+              {saveStatus === 'success' && (
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 animate-in fade-in duration-200">
+                  <Check size={20} />
+                  <span className="font-medium">Settings saved!</span>
+                </div>
+              )}
+
+              {saveStatus === 'error' && (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <X size={20} />
+                    <span className="font-medium">Failed to save: {saveError}</span>
+                  </div>
+                  <button
+                    onClick={onSaveSettings}
+                    className="text-sm text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {(!userId || !backendConnected) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                ⚠️ {!userId ? 'User ID not available' : 'Backend must be running to save settings'}
+              </p>
+            )}
           </div>
 
           {/* Danger Zone */}

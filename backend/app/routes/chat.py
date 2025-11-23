@@ -11,9 +11,11 @@ from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import Optional
-from app.config import logger
+from app.config import logger, DEFAULT_SETTINGS
+from app.database import Message, Chat, User, UserSettings
 from .dependencies import get_langchain_manager, get_mem0_manager, get_openai_client, DBSession
 from .chats import generate_title_background
+from sqlmodel import select
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -22,11 +24,12 @@ class ChatRequest(BaseModel):
     userId: str
     message: str
     searchMode: Optional[str] = "normal"
-    model: Optional[str] = "llama2"
-    temperature: Optional[float] = 0.7
-    maxTokens: Optional[int] = 512
-    systemPrompt: Optional[str] = "You are a helpful assistant."
     useMemory: Optional[bool] = True
+    # Settings fields kept for backward compatibility but will be overridden by database values
+    model: Optional[str] = None
+    temperature: Optional[float] = None
+    maxTokens: Optional[int] = None
+    systemPrompt: Optional[str] = None
 
 
 @router.post("/stream")
@@ -50,9 +53,29 @@ async def chat_stream(
     
     async def generate():
         try:
-            # 0. Save user message to database
-            from app.database import Message, Chat, User
+            # 0. Load user settings from database
+            user_settings = session.exec(
+                select(UserSettings).where(UserSettings.user_id == payload.userId)
+            ).first()
             
+            if not user_settings:
+                logger.warning(f"UserSettings not found for user {payload.userId}, using defaults from config")
+                temperature = DEFAULT_SETTINGS["temperature"]
+                max_tokens = DEFAULT_SETTINGS["max_tokens"]
+                top_p = DEFAULT_SETTINGS["top_p"]
+                top_k = DEFAULT_SETTINGS["top_k"]
+                system_prompt = DEFAULT_SETTINGS["system_prompt"]
+                model = payload.model or "llama2"  # Fallback to request if provided
+            else:
+                temperature = user_settings.temperature
+                max_tokens = user_settings.max_tokens
+                top_p = user_settings.top_p
+                top_k = user_settings.top_k
+                system_prompt = user_settings.system_prompt
+                model = user_settings.default_model
+                logger.debug(f"Loaded settings for user {payload.userId}: temp={temperature}, tokens={max_tokens}, model={model}")
+            
+            # 1. Save user message to database
             try:
                 # Verify chat exists (or create it)
                 chat = session.get(Chat, payload.chatId)
@@ -92,7 +115,7 @@ async def chat_stream(
                     role="user",
                     content=payload.message,
                     search_mode=payload.searchMode,
-                    model_used=payload.model
+                    model_used=model  # Use loaded settings
                 )
                 session.add(user_message)
                 session.commit()
@@ -171,7 +194,7 @@ async def chat_stream(
                 logger.info(f"Skipping Mem0 query (useMemory={payload.useMemory})")
 
             # 3. Build conversation messages with context
-            messages = [{"role": "system", "content": payload.systemPrompt}]
+            messages = [{"role": "system", "content": system_prompt}]
             
             # Add context in order of priority
             if mem0_context:
@@ -184,10 +207,12 @@ async def chat_stream(
             # 4. Stream response tokens
             full_response = ""
             async for chunk in openai_client.create_chat_completion(
-                model=payload.model,
+                model=model,
                 messages=messages,
-                temperature=payload.temperature,
-                max_tokens=payload.maxTokens,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
+                top_k=top_k,
                 stream=True
             ):
                 # Chunk format: {"token": "...", "done": bool}
@@ -227,7 +252,7 @@ async def chat_stream(
                     role="assistant",
                     content=full_response,
                     search_mode=payload.searchMode,
-                    model_used=payload.model,
+                    model_used=model,  # Use loaded settings
                     sources=json.dumps(sources) if sources else None  # Store sources as JSON
                 )
                 session.add(assistant_message)

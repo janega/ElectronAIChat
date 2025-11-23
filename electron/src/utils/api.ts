@@ -308,6 +308,89 @@ export class ApiClient {
       return { success: false };
     }
   }
+
+  async getUserSettings(userId: string): Promise<UserSettingsResponse> {
+    const url = `${this.baseUrl}/api/users/${userId}/settings`;
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get user settings: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async updateUserSettings(userId: string, settings: SettingsPayload): Promise<UserSettingsResponse> {
+    const url = `${this.baseUrl}/api/users/${userId}/settings`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(settings),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update user settings: ${response.status}`);
+    }
+
+    return response.json();
+  }
+}
+
+// Type definitions for settings API
+export interface UserSettingsResponse {
+  id: string;
+  user_id: string;
+  default_model: string;
+  temperature: number;
+  max_tokens: number;
+  top_p: number;
+  top_k: number;
+  system_prompt: string;
+  theme: string;
+  use_memory: boolean;
+  use_mcp: boolean;
+  updated_at: string;
+}
+
+export interface SettingsPayload {
+  default_model?: string;
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  top_k?: number;
+  system_prompt?: string;
+  theme?: string;
+  use_memory?: boolean;
+  use_mcp?: boolean;
+}
+
+// Helper functions for field mapping (camelCase <-> snake_case)
+export function toBackendSettings(frontend: import('../types').AppSettings): SettingsPayload {
+  return {
+    default_model: frontend.model,
+    temperature: frontend.temperature,
+    max_tokens: frontend.maxTokens,
+    top_p: frontend.topP,
+    top_k: frontend.topK,
+    system_prompt: frontend.systemPrompt,
+    // ollamaHost is not sent (should be global config, not per-user)
+  };
+}
+
+export function toFrontendSettings(backend: UserSettingsResponse): import('../types').AppSettings {
+  return {
+    model: backend.default_model,
+    temperature: backend.temperature,
+    maxTokens: backend.max_tokens,
+    topP: backend.top_p,
+    topK: backend.top_k,
+    systemPrompt: backend.system_prompt,
+    ollamaHost: 'http://localhost:11434', // Keep default, not synced from backend
+  };
 }
 
 export const apiClient = new ApiClient();

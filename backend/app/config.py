@@ -155,5 +155,15 @@ DEFAULT_OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "gpt-3.5-turbo")
 # OCR Configuration (Poppler path for pdf2image)
 POPPLER_PATH = os.getenv("POPPLER_PATH", r"D:\My Coding Projects\Poppler\poppler-25.07.0\Library\bin")
 
+# Default settings for new users and fallback when UserSettings missing
+DEFAULT_SETTINGS = {
+    "temperature": 0.7,
+    "max_tokens": 2048,
+    "top_p": 0.9,
+    "top_k": 40,
+    "system_prompt": "You are a helpful assistant.",
+    "use_memory": True,
+}
+
 # Other
 APP_NAME = os.getenv("APP_NAME", "ElectronAIChat Backend")

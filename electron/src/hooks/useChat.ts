@@ -32,16 +32,12 @@ export function useChat() {
       try {
         let fullResponse = '';
 
-        // Updated to match new backend ChatRequest model
+        // Backend will load settings from database - only send chat-specific data
         const payload = {
           chatId,
           userId: userId,
           message: content,
           searchMode,
-          model: settings.model,
-          temperature: settings.temperature,
-          maxTokens: settings.maxTokens,
-          systemPrompt: settings.systemPrompt,
           useMemory: useMemory,
         };
 

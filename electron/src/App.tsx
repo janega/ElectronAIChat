@@ -17,7 +17,7 @@ import {
 
 function AppContent() {
   const { isDark, setIsDark } = useTheme();
-  const { settings, updateSetting } = useSettings();
+  const { settings, updateSetting, saveStatus, saveError, loadSettingsFromBackend, saveSettingsToBackend } = useSettings();
   const { 
     username, 
     userId,
@@ -78,6 +78,10 @@ function AppContent() {
         // Create or get user (idempotent - returns existing user if already exists)
         const userResponse = await apiClient.createUser(username);
         setUserId(userResponse.id); // Store user ID
+        
+        // Load user settings from backend
+        await loadSettingsFromBackend(userResponse.id);
+        
         await syncFromBackend();
         await syncUnsyncedChats();
         setLastSyncTime(Date.now());
@@ -106,6 +110,9 @@ function AppContent() {
       // Store both username and user ID (context handles localStorage)
       setUsername(newUsername);
       setUserId(userResponse.id);
+      
+      // Load user settings from backend after user creation
+      await loadSettingsFromBackend(userResponse.id);
       
       await syncFromBackend();
       await syncUnsyncedChats(); // Sync any local-only chats created before username was set
@@ -511,6 +518,10 @@ function AppContent() {
               onSettingChange={updateSetting}
               onTestBackend={checkBackendStatus}
               backendConnected={backendConnected}
+              userId={userId}
+              saveStatus={saveStatus}
+              saveError={saveError}
+              onSaveSettings={() => userId && saveSettingsToBackend(userId)}
             />
           </div>
         </div>
