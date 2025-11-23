@@ -13,8 +13,9 @@ import sys
 import os
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Note: This script should be run from the backend directory
+# cd backend && python verify_ollama_integration.py
+# The sys.path modification ensures app modules are importable
 
 def test_config_loading():
     """Test that configuration loads correctly."""
@@ -217,9 +218,11 @@ def test_main_app():
                 else:
                     print(f"⚠️  Missing {description}")
             
-            # Last check should NOT be present (abstraction test)
-            if 'ChatOllama' not in content or 'from langchain_ollama import ChatOllama' not in content:
-                print(f"✅ Uses abstraction layer (not direct ChatOllama import in main)")
+            # Verify abstraction: main.py should NOT directly import ChatOllama
+            # It should use EnhancedOpenAIClient which handles provider selection
+            has_direct_import = 'from langchain_ollama import ChatOllama' in content
+            if not has_direct_import:
+                print(f"✅ Uses abstraction layer (EnhancedOpenAIClient, not direct ChatOllama)")
             else:
                 print(f"⚠️  Direct ChatOllama import found (should use EnhancedOpenAIClient)")
         

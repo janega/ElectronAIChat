@@ -18,8 +18,9 @@ A desktop RAG (Retrieval-Augmented Generation) application with **Electron** fro
 
 1. **Install Ollama** (for local LLM):
    ```bash
-   # Visit https://ollama.ai or:
-   curl -fsSL https://ollama.com/install.sh | sh  # macOS/Linux
+   # Download from https://ollama.ai (recommended)
+   # Or for macOS/Linux (inspect script first for security):
+   # curl -fsSL https://ollama.com/install.sh | sh
    ```
 
 2. **Pull Required Models**:

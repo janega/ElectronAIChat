@@ -36,9 +36,9 @@ FastAPI Backend → LangChain → Ollama
 
 **Windows/macOS/Linux:**
 ```bash
-# Visit https://ollama.ai and download installer
-# Or use command line (macOS/Linux):
-curl -fsSL https://ollama.com/install.sh | sh
+# Visit https://ollama.ai and download installer (recommended)
+# Or use command line (macOS/Linux - inspect script first for security):
+# curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 **Verify Installation:**

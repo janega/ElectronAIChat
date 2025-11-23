@@ -11,14 +11,16 @@ Get ElectronAIChat running in 5 minutes with Ollama.
 
 ### macOS
 ```bash
-# Option 1: Download from https://ollama.ai/download/mac
-# Option 2: Use command line
-curl -fsSL https://ollama.com/install.sh | sh
+# Option 1: Download from https://ollama.ai/download/mac (recommended)
+# Option 2: Use command line (inspect script first for security)
+# curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 ### Linux
 ```bash
-curl -fsSL https://ollama.com/install.sh | sh
+# Option 1: Download from https://ollama.ai/download (recommended)
+# Option 2: Use install script (inspect first for security)
+# curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 **Verify installation:**

@@ -354,7 +354,7 @@ Once verified, you can:
 
 ## Resources
 
-- **Verification Script:** `backend/verify_ollama_integration.py`
+- **Verification Script:** `../backend/verify_ollama_integration.py` (run from project root)
 - **Setup Guide:** [OLLAMA_SETUP.md](OLLAMA_SETUP.md)
 - **Quick Start:** [QUICKSTART.md](QUICKSTART.md)
 - **Main README:** [../README.md](../README.md)
