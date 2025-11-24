@@ -11,6 +11,7 @@ Enhanced from original with:
 - JSON file processing
 """
 import os
+import subprocess
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -60,13 +61,89 @@ async def lifespan(app: FastAPI):
     logger.info(f"Logs Directory: {LOGS_DIR}")
     logger.info(f"LLM Provider: {PROVIDER}")
     
+    # Validate provider configuration
+    startup_errors = []
+    
     if PROVIDER == "ollama":
         logger.info(f"Ollama Host: {OLLAMA_HOST}")
         logger.info(f"Ollama LLM Model: {DEFAULT_OLLAMA_LLM_MODEL}")
         logger.info(f"Ollama Embed Model: {DEFAULT_OLLAMA_EMBED_MODEL}")
-    else:
+        logger.info("=" * 80)
+        logger.info("Ensuring Ollama is running...")
+        
+        # Ensure Ollama is running (will attempt to start if not)
+        from app.utils import ensure_ollama_running
+        ollama_status = await ensure_ollama_running(OLLAMA_HOST)
+        
+        if not ollama_status["running"]:
+            error_msg = f"Ollama could not be started: {ollama_status['error']}"
+            logger.error(f"{error_msg}")
+            startup_errors.append({
+                "component": "ollama",
+                "message": error_msg,
+                "suggestion": "Install Ollama from https://ollama.ai or start it manually with: ollama serve"
+            })
+        else:
+            # Ollama is running - verify required models are available
+            if ollama_status["started_by_us"]:
+                logger.info("Started Ollama server successfully")
+                # Store process reference for cleanup on shutdown
+                app.state.ollama_process = ollama_status.get("process")
+            else:
+                logger.info("Ollama server is already running")
+                app.state.ollama_process = None
+            
+            # Check for exact version match
+            available_models = ollama_status.get("models", [])
+            required_models = [DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OLLAMA_EMBED_MODEL]
+            missing_models = [m for m in required_models if m not in available_models]
+            
+            if missing_models:
+                error_msg = f"Required Ollama models not found: {missing_models}"
+                logger.warning(f"{error_msg}")
+                logger.info(f"Available models: {available_models}")
+                startup_errors.append({
+                    "component": "ollama_models",
+                    "message": error_msg,
+                    "suggestion": f"Pull missing models: {' and '.join([f'ollama pull {m}' for m in missing_models])}"
+                })
+            else:
+                logger.info(f"All required Ollama models available: {required_models}")
+    
+    elif PROVIDER == "openai":
         logger.info(f"OpenAI LLM Model: {DEFAULT_OPENAI_LLM_MODEL}")
         logger.info(f"OpenAI Embed Model: {DEFAULT_OPENAI_EMBED_MODEL}")
+        
+        if not OPENAI_API_KEY or OPENAI_API_KEY == "":
+            error_msg = "OPENAI_API_KEY is not set in environment"
+            logger.error(f"{error_msg}")
+            startup_errors.append({
+                "component": "openai_api_key",
+                "message": error_msg,
+                "suggestion": "Set OPENAI_API_KEY in .env file"
+            })
+        else:
+            logger.info("✅ OpenAI API key configured")
+    
+    else:
+        error_msg = f"Unknown provider: {PROVIDER}"
+        logger.error(f"{error_msg}")
+        startup_errors.append({
+            "component": "provider",
+            "message": error_msg,
+            "suggestion": "Set LLM_PROVIDER to 'ollama' or 'openai' in .env"
+        })
+    
+    # Log startup validation results
+    if startup_errors:
+        logger.warning("=" * 80)
+        logger.warning("STARTUP VALIDATION WARNINGS:")
+        for error in startup_errors:
+            logger.warning(f"  • [{error['component']}] {error['message']}")
+            logger.warning(f"    → {error['suggestion']}")
+        logger.warning("=" * 80)
+        logger.warning("Backend will start but may fail at runtime. Fix issues above.")
+        logger.warning("=" * 80)
     
     logger.info(f"Database: {DATABASE_PATH}")
     logger.info(f"ChromaDB: {BASE_DIR / 'chroma_db'}")
@@ -76,22 +153,33 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
     
     # Initialize shared managers (single instances)
-    langchain_manager = LangChainEmbeddingManager(provider=PROVIDER)
+    try:
+        langchain_manager = LangChainEmbeddingManager(provider=PROVIDER)
+    except Exception as e:
+        logger.error(f"Failed to initialize LangChain manager: {e}")
+        if PROVIDER == "ollama" and not any(err["component"] == "ollama" for err in startup_errors):
+            logger.error("This usually means Ollama is not running or models are not available")
+        raise
+    
     mem0_manager = Mem0MemoryManager()
     
     # Initialize OpenAI client based on provider
-    if PROVIDER == "ollama":
-        openai_client = EnhancedOpenAIClient(
-            base_url=OLLAMA_HOST,
-            api_key="ollama",
-            provider="ollama"
-        )
-    else:
-        openai_client = EnhancedOpenAIClient(
-            base_url="https://api.openai.com/v1",
-            api_key=OPENAI_API_KEY,
-            provider="openai"
-        )
+    try:
+        if PROVIDER == "ollama":
+            openai_client = EnhancedOpenAIClient(
+                base_url=OLLAMA_HOST,
+                api_key="ollama",
+                provider="ollama"
+            )
+        else:
+            openai_client = EnhancedOpenAIClient(
+                base_url="https://api.openai.com/v1",
+                api_key=OPENAI_API_KEY,
+                provider="openai"
+            )
+    except Exception as e:
+        logger.error(f"Failed to initialize LLM client: {e}")
+        raise
     
     # Set up dependency injection for managers
     dependencies.set_managers(
@@ -103,12 +191,35 @@ async def lifespan(app: FastAPI):
     logger.info("All managers initialized successfully")
     logger.info("=" * 80)
     
+    # Store startup errors in app state for health endpoint
+    app.state.startup_errors = startup_errors
+    
     # Yield control to application (runs while app is active)
     yield
     
     # Shutdown: Cleanup resources
     logger.info("=" * 80)
     logger.info("ElectronAIChat Backend Shutting Down")
+    
+    # Kill Ollama process if we started it
+    if PROVIDER == "ollama" and hasattr(app.state, 'ollama_process') and app.state.ollama_process:
+        logger.info("Stopping Ollama server (started by backend)...")
+        try:
+            # Terminate gracefully first
+            app.state.ollama_process.terminate()
+            try:
+                # Wait up to 5 seconds for graceful shutdown
+                app.state.ollama_process.wait(timeout=5)
+                logger.info("✅ Ollama server stopped gracefully")
+            except subprocess.TimeoutExpired:
+                # Force kill if it doesn't stop gracefully
+                logger.warning("Ollama didn't stop gracefully, forcing kill...")
+                app.state.ollama_process.kill()
+                app.state.ollama_process.wait()
+                logger.info("✅ Ollama server killed")
+        except Exception as e:
+            logger.error(f"Failed to stop Ollama process: {e}")
+    
     logger.info("=" * 80)
 
 

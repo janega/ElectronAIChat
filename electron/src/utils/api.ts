@@ -189,6 +189,19 @@ export class ApiClient {
     return response.json();
   }
 
+  async getHealth(): Promise<any> {
+    const url = `${this.baseUrl}/api/health`;
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Health check failed: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
   async getUserChats(userId: string): Promise<any[]> {
     const url = `${this.baseUrl}/api/chats/${userId}`;
     const response = await fetch(url, {

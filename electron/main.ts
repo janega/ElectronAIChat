@@ -77,6 +77,42 @@ async function waitForHealth(url: string | URL | Request, timeoutMs = 30000, int
       if (res.ok) {
         const elapsed = ((Date.now() - start) / 1000).toFixed(1);
         console.log(`✅ Backend health check passed after ${elapsed}s (${attempts + 1} attempts)`);
+        
+        // Check for startup warnings
+        try {
+          const healthData = await res.json();
+          const startupValidation = healthData?.components?.startup_validation;
+          
+          if (startupValidation && !startupValidation.passed) {
+            console.warn('⚠️ Backend started with warnings:');
+            startupValidation.warnings.forEach((warning: any) => {
+              console.warn(`  • [${warning.component}] ${warning.message}`);
+              console.warn(`    → ${warning.suggestion}`);
+            });
+            
+            // Show dialog to user (non-blocking)
+            const warningMessages = startupValidation.warnings
+              .map((w: any) => `• ${w.message}\n  → ${w.suggestion}`)
+              .join('\n\n');
+            
+            dialog.showMessageBox({
+              type: 'warning',
+              title: 'Backend Configuration Warning',
+              message: 'Backend started but some components have issues:',
+              detail: warningMessages,
+              buttons: ['Continue Anyway', 'Quit'],
+              defaultId: 0,
+              cancelId: 1
+            }).then(result => {
+              if (result.response === 1) {
+                app.quit();
+              }
+            });
+          }
+        } catch (parseError) {
+          console.warn('Could not parse health check response for warnings:', parseError);
+        }
+        
         return;
       }
     } catch {
@@ -142,20 +178,59 @@ function startBackend() {
 //
 
 async function stopBackend() {
+  console.log("Stopping backend gracefully...");
+  
+  // First try graceful shutdown (without /F flag)
+  try {
+    await execAsync(`taskkill /IM backend.exe /T`);
+    console.log("Sent shutdown signal to backend.exe");
+    
+    // Wait up to 5 seconds for graceful shutdown
+    const maxWait = 5000;
+    const startTime = Date.now();
+    let processExists = true;
+    
+    while (processExists && (Date.now() - startTime) < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        // Check if process still exists
+        await execAsync(`tasklist /FI "IMAGENAME eq backend.exe"`);
+        // If we get here, process might still exist (tasklist doesn't error)
+        // Check the output more carefully
+        const { stdout } = await execAsync(`tasklist /FI "IMAGENAME eq backend.exe" /NH`);
+        processExists = stdout.includes("backend.exe");
+      } catch {
+        processExists = false;
+      }
+    }
+    
+    if (!processExists) {
+      console.log("✅ Backend stopped gracefully");
+      return;
+    } else {
+      console.warn("⚠️ Backend didn't stop gracefully, forcing shutdown...");
+    }
+  } catch (err: any) {
+    if (err.code === 128 || /not found/i.test(err.stderr)) {
+      console.log("No backend.exe process found");
+      return;
+    }
+    console.warn("Graceful shutdown failed, trying force kill...", err.message);
+  }
+  
+  // Force kill if graceful shutdown failed
   let found;
   do {
     try {
-      // Try to kill all backend.exe processes
       await execAsync(`taskkill /IM backend.exe /T /F`);
-      console.log("Killed one or more backend.exe processes...");
+      console.log("Force killed backend.exe");
       found = true;
     } catch (err: any) {
-      // taskkill returns error code 128 if no process found
       if (err.code === 128 || /not found/i.test(err.stderr)) {
-        console.log("No more backend.exe processes found.");
+        console.log("No more backend.exe processes found");
         found = false;
       } else {
-        console.error("Error killing backend.exe:", err);
+        console.error("Error force killing backend.exe:", err);
         found = false;
       }
     }
