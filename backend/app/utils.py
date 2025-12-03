@@ -82,7 +82,7 @@ async def check_ollama_health(base_url: str = OLLAMA_HOST, timeout: float = 5.0)
 
 async def start_ollama_server() -> dict:
     """
-    Attempt to start Ollama server process.
+    Attempt to start Ollama server as independent background process.
     
     Returns:
         Dict with 'started' (bool), 'process' (subprocess.Popen or None), 'error' (str or None)
@@ -97,69 +97,57 @@ async def start_ollama_server() -> dict:
     try:
         logger.info("Attempting to start Ollama server...")
         
-        # Try to start ollama serve in a subprocess
-        # Use CREATE_NO_WINDOW to hide console window on Windows
+        # Start ollama serve as completely independent detached process
+        # This process will continue running even after backend exits
         import sys
         if sys.platform == "win32":
             # Windows: Start detached process without console window
+            # DETACHED_PROCESS makes it independent from parent process
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = subprocess.SW_HIDE
             
             process = subprocess.Popen(
                 ["ollama", "serve"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
                 startupinfo=startupinfo,
-                creationflags=subprocess.CREATE_NO_WINDOW
+                creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+                close_fds=True
             )
         else:
-            # Linux/Mac: Standard subprocess
+            # Linux/Mac: Start as daemon-like process
             process = subprocess.Popen(
                 ["ollama", "serve"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True  # Detach from parent session
             )
         
-        # Give it a moment to start or fail
-        await asyncio.sleep(2)
+        # Give Ollama a moment to initialize
+        logger.info("Waiting for Ollama to initialize...")
+        await asyncio.sleep(3)
         
-        # Check if process is still running
-        if process.poll() is None:
-            # Process is running, now verify health
-            logger.info("Ollama process started, waiting for health check...")
-            
-            # Wait up to 10 seconds for Ollama to become healthy
-            max_wait = 10
-            for i in range(max_wait):
-                health = await check_ollama_health(timeout=2.0)
-                if health["available"]:
-                    result["started"] = True
-                    result["process"] = process
-                    logger.info(f"✅ Ollama server started successfully (took {i+1}s)")
-                    return result
-                await asyncio.sleep(1)
-            
-            # Timeout waiting for health
-            result["error"] = "Ollama process started but health check failed after 10s"
-            logger.warning(f"⚠️ {result['error']}")
-            # Keep process running, might just need more time
-            result["process"] = process
-            result["started"] = True  # Mark as started even if health check pending
-            
-        else:
-            # Process exited immediately - check why
-            return_code = process.returncode
-            stderr_output = process.stderr.read().decode('utf-8', errors='ignore') if process.stderr else ""
-            
-            # Check if already running (common error message)
-            if "already" in stderr_output.lower() or "address already in use" in stderr_output.lower():
-                result["already_running"] = True
-                result["error"] = "Ollama server is already running"
-                logger.info("ℹ️ Ollama server already running (detected from process output)")
-            else:
-                result["error"] = f"Ollama process exited with code {return_code}: {stderr_output[:200]}"
-                logger.error(f"❌ {result['error']}")
+        # Verify health instead of checking process status
+        # (process is detached, so we can't poll it reliably)
+        max_wait = 15
+        for i in range(max_wait):
+            health = await check_ollama_health(timeout=2.0)
+            if health["available"]:
+                result["started"] = True
+                result["process"] = process  # Store reference so we can kill it on shutdown
+                logger.info(f"✅ Ollama server started successfully (took {i+1}s)")
+                logger.info(f"   Found {len(health.get('models', []))} models available")
+                return result
+            await asyncio.sleep(1)
+        
+        # Timeout waiting for health
+        result["error"] = "Ollama process started but health check failed after 15s"
+        logger.warning(f"⚠️ {result['error']}")
+        logger.warning("   Ollama may still be starting up. It will continue running in background.")
+        result["started"] = True  # Mark as started, let it continue initializing
         
     except FileNotFoundError:
         result["error"] = "Ollama command not found - Ollama is not installed"
@@ -169,6 +157,81 @@ async def start_ollama_server() -> dict:
         logger.exception(f"❌ {result['error']}")
     
     return result
+
+
+def stop_ollama_process(process: subprocess.Popen) -> bool:
+    """
+    Stop Ollama process gracefully (or forcefully if needed).
+    
+    Args:
+        process: Popen object for Ollama process
+        
+    Returns:
+        True if successfully stopped, False otherwise
+    """
+    import sys
+    
+    if not process:
+        return False
+    
+    try:
+        logger.info("Stopping Ollama process...")
+        
+        if sys.platform == "win32":
+            # Windows: Use taskkill to stop ollama.exe and all child processes
+            try:
+                # Try graceful shutdown first
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T"],
+                    capture_output=True,
+                    timeout=5
+                )
+                time.sleep(2)
+                
+                # Check if still running, force kill if necessary
+                result = subprocess.run(
+                    ["tasklist", "/FI", f"PID eq {process.pid}"],
+                    capture_output=True,
+                    text=True
+                )
+                if str(process.pid) in result.stdout:
+                    logger.warning("Ollama didn't stop gracefully, forcing kill...")
+                    subprocess.run(
+                        ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                        capture_output=True,
+                        timeout=5
+                    )
+                
+                logger.info("✅ Ollama process stopped")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Failed to kill Ollama with taskkill: {e}")
+                # Fallback to terminate
+                try:
+                    process.terminate()
+                    process.wait(timeout=5)
+                    return True
+                except:
+                    process.kill()
+                    return True
+        else:
+            # Linux/Mac: Standard termination
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+                logger.info("✅ Ollama process stopped gracefully")
+                return True
+            except subprocess.TimeoutExpired:
+                logger.warning("Ollama didn't stop gracefully, forcing kill...")
+                process.kill()
+                process.wait()
+                logger.info("✅ Ollama process killed")
+                return True
+                
+    except Exception as e:
+        logger.error(f"Failed to stop Ollama process: {e}")
+        return False
 
 
 async def ensure_ollama_running(base_url: str = OLLAMA_HOST) -> dict:

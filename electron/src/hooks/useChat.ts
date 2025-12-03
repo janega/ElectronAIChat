@@ -78,11 +78,31 @@ export function useChat() {
                 onStreamUpdate?.(chatId, aiMessage, true);
                 aiMessageAdded = true;
               }
+              
+              // Mark stream as complete
+              setIsLoading(false);
+              activeStreamsRef.current.delete(chatId);
+              console.log('[useChat] Stream completed with sources for chat:', chatId);
               return; // Don't process further for done event
             }
             
             // Skip processing if stream is done (without sources)
             if (chunk.done) {
+              // Mark stream as complete even without sources
+              setIsLoading(false);
+              activeStreamsRef.current.delete(chatId);
+              console.log('[useChat] Stream completed without sources for chat:', chatId);
+              
+              // Send final update
+              if (aiMessageAdded) {
+                const finalMessage: Message = {
+                  id: aiMessageId,
+                  role: 'assistant',
+                  content: fullResponse,
+                  timestamp: new Date().toISOString(),
+                };
+                onStreamUpdate?.(chatId, finalMessage, true);
+              }
               return;
             }
             

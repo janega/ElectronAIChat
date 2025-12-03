@@ -69,9 +69,9 @@ async def lifespan(app: FastAPI):
         logger.info(f"Ollama LLM Model: {DEFAULT_OLLAMA_LLM_MODEL}")
         logger.info(f"Ollama Embed Model: {DEFAULT_OLLAMA_EMBED_MODEL}")
         logger.info("=" * 80)
-        logger.info("Ensuring Ollama is running...")
+        logger.info("Checking Ollama service...")
         
-        # Ensure Ollama is running (will attempt to start if not)
+        # Check if Ollama is running, start as independent process if needed
         from app.utils import ensure_ollama_running
         ollama_status = await ensure_ollama_running(OLLAMA_HOST)
         
@@ -86,12 +86,13 @@ async def lifespan(app: FastAPI):
         else:
             # Ollama is running - verify required models are available
             if ollama_status["started_by_us"]:
-                logger.info("Started Ollama server successfully")
+                logger.info("✅ Started Ollama as independent background service")
+                logger.info("   Ollama will be stopped when backend exits")
                 # Store process reference for cleanup on shutdown
                 app.state.ollama_process = ollama_status.get("process")
             else:
-                logger.info("Ollama server is already running")
-                app.state.ollama_process = None
+                logger.info("✅ Ollama service is already running")
+                app.state.ollama_process = None  # Don't kill processes we didn't start
             
             # Check for exact version match
             available_models = ollama_status.get("models", [])
@@ -204,21 +205,10 @@ async def lifespan(app: FastAPI):
     # Kill Ollama process if we started it
     if PROVIDER == "ollama" and hasattr(app.state, 'ollama_process') and app.state.ollama_process:
         logger.info("Stopping Ollama server (started by backend)...")
-        try:
-            # Terminate gracefully first
-            app.state.ollama_process.terminate()
-            try:
-                # Wait up to 5 seconds for graceful shutdown
-                app.state.ollama_process.wait(timeout=5)
-                logger.info("✅ Ollama server stopped gracefully")
-            except subprocess.TimeoutExpired:
-                # Force kill if it doesn't stop gracefully
-                logger.warning("Ollama didn't stop gracefully, forcing kill...")
-                app.state.ollama_process.kill()
-                app.state.ollama_process.wait()
-                logger.info("✅ Ollama server killed")
-        except Exception as e:
-            logger.error(f"Failed to stop Ollama process: {e}")
+        from app.utils import stop_ollama_process
+        stop_ollama_process(app.state.ollama_process)
+    elif PROVIDER == "ollama":
+        logger.info("ℹ️ Ollama was already running, leaving it active")
     
     logger.info("=" * 80)
 

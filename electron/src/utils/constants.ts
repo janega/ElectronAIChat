@@ -10,7 +10,7 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  model: 'mistral',
+  model: 'llama2:latest',
   temperature: 0.7,
   maxTokens: 2048,
   topP: 0.9,

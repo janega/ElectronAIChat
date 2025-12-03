@@ -6,6 +6,12 @@ from fastapi.concurrency import run_in_threadpool
 
 logger = logging.getLogger("chat_backend.memory")
 
+# Memory extraction prompt for deterministic, focused fact extraction
+MEMORY_EXTRACTION_PROMPT = """Extract only long-term, explicit user facts suitable for persistence across sessions.
+Exclude ephemeral states, time-bound info, jokes, or vague inferences.
+Save only if the fact is explicit and unambiguous.
+Focus on: user preferences, skills, workflows, projects, tools, and personal information."""
+
 # Try to import mem0; if not available, provide a light fallback stub to avoid crash during dev/testing.
 try:
     from mem0 import Memory
@@ -35,7 +41,7 @@ class MemoryStub:
         results = []
         for item in reversed(all_for_user[-limit:]):
             results.append({"memory": " | ".join([m.get("content", "") for m in item.get("messages", [])]), "metadata": item.get("metadata", {})})
-        return results
+        return {"results": results}  # v1.1 format wrapper
 
     def get_all(self, user_id: str):
         return self._store.get(user_id, [])
@@ -78,6 +84,11 @@ class Mem0MemoryManager:
         - mem0 library has strict config schema requirements per provider
         - We gracefully fallback to MemoryStub if initialization fails
         - This allows the app to run even if mem0 is misconfigured
+        
+        v1.0 Features:
+        - custom_instructions: Guides LLM to extract only long-term, explicit facts
+        - Deterministic extraction: Low temperature (0.1) and focused top_p (0.2)
+        - v1.1 format: All responses return {"results": [...]} wrapper
         """
         
         # Build base config structure for mem0
@@ -89,6 +100,7 @@ class Mem0MemoryManager:
                     "path": str(CHROMA_DIR / "mem0"),
                 }
             },
+            "custom_instructions": MEMORY_EXTRACTION_PROMPT,  # v1.0 feature
         }
         
         # Add provider-specific LLM configuration
@@ -97,18 +109,18 @@ class Mem0MemoryManager:
                 "provider": "ollama",
                 "config": {
                     "model": DEFAULT_OLLAMA_LLM_MODEL,
-                    "temperature": 0.1,
-                    "max_tokens": 2000,
-                    "ollama_base_url": OLLAMA_HOST,  # mem0 uses ollama_base_url, not base_url,
-                    "top_p": 0.8,  # Slightly more focused than 0.9
-                    "top_k": 40,
+                    "temperature": 0.1,  # Deterministic extraction
+                    "max_tokens": 250,  # Increased for complex fact extraction
+                    "ollama_base_url": OLLAMA_HOST,  # mem0 uses ollama_base_url, not base_url
+                    "top_p": 0.2,  # Very focused sampling for explicit facts only
+                    "top_k": 10,  # Moderate diversity for extraction quality
                 }
             }
             config["embedder"] = {
                 "provider": "ollama",
                 "config": {
-                    "model": "nomic-embed-text",
-                    "ollama_base_url": OLLAMA_HOST,  # mem0 uses ollama_base_url, not base_url
+                    "model": "nomic-embed-text:latest",
+                    "ollama_base_url": OLLAMA_HOST,
                 }
             }
         else:
@@ -117,11 +129,11 @@ class Mem0MemoryManager:
                 "provider": "openai",
                 "config": {
                     "model": DEFAULT_OPENAI_LLM_MODEL,
-                    "temperature": 0.1,
-                    "max_tokens": 2000,
+                    "temperature": 0.1,  # Deterministic extraction
+                    "max_tokens": 250,  # Increased for complex fact extraction
                     "api_key": OPENAI_API_KEY,
-                    "top_p": 0.8,  # Slightly more focused than 0.9
-                    "top_k": 40,
+                    "top_p": 0.2,  # Very focused sampling for explicit facts only
+                    # Note: OpenAI doesn't support top_k parameter
                 }
             }
             config["embedder"] = {
@@ -134,6 +146,10 @@ class Mem0MemoryManager:
 
         if Memory is not None:
             try:
+                # Debug: Log config structure before initialization
+                import json
+                logger.info(f"Initializing mem0 with config: {json.dumps({k: v if k != 'custom_instructions' else '...' for k, v in config.items()}, indent=2, default=str)}")
+                
                 self.memory = Memory.from_config(config)
                 logger.info(f"mem0 Memory initialized successfully with provider: {PROVIDER}")
             except TypeError as e:
@@ -151,25 +167,74 @@ class Mem0MemoryManager:
             logger.info("mem0 package not available, using in-memory MemoryStub")
             self.memory = MemoryStub()
 
-    def add_message(self, user_id: str, message: str, role: str = "user", metadata: Optional[Dict] = None):
-        # Validate inputs before attempting to store
-        if not message or not message.strip():
-            logger.debug(f"Skipping empty message for user {user_id}")
-            return None
+    def _should_persist(self, message: str) -> bool:
+        """
+        Semantic filter to determine if a message should be persisted to long-term memory.
+        Rejects greetings, filler words, very short messages, and question-only content.
         
-        # Additional validation: ensure minimum content length
-        if len(message.strip()) < 3:
-            logger.debug(f"Skipping too-short message for user {user_id}: '{message[:50]}'")
+        Returns:
+            True if message should be stored, False otherwise
+        """
+        if not message or not message.strip():
+            return False
+        
+        normalized = message.strip().lower()
+        
+        # Reject very short messages (< 10 words)
+        word_count = len(normalized.split())
+        if word_count < 10:
+            # Allow short declarative statements if they contain key indicators
+            key_indicators = ["prefer", "like", "use", "work", "specialize", "live in", "am a", "my"]
+            if not any(indicator in normalized for indicator in key_indicators):
+                logger.debug(f"Rejecting short message ({word_count} words): '{message[:50]}...'")
+                return False
+        
+        # Reject common greetings and fillers
+        greetings = ["hi", "hello", "hey", "thanks", "thank you", "bye", "goodbye", "ok", "okay"]
+        filler_patterns = ["hmm", "uh", "um", "ah", "well", "i see", "got it", "makes sense"]
+        
+        # Check if message is ONLY a greeting/filler (not part of longer content)
+        if normalized in greetings or normalized in filler_patterns:
+            logger.debug(f"Rejecting greeting/filler: '{message[:50]}...'")
+            return False
+        
+        # Reject question-only messages (unless they reveal user preferences)
+        if normalized.endswith("?") and word_count < 15:
+            preference_markers = ["should i", "do i", "can i", "would i", "my", "i prefer"]
+            if not any(marker in normalized for marker in preference_markers):
+                logger.debug(f"Rejecting question-only message: '{message[:50]}...'")
+                return False
+        
+        # Reject vague/ambiguous statements
+        vague_patterns = ["it depends", "maybe", "perhaps", "i guess", "not sure", "might be"]
+        if any(pattern in normalized for pattern in vague_patterns) and word_count < 15:
+            logger.debug(f"Rejecting vague statement: '{message[:50]}...'")
+            return False
+        
+        return True
+
+    def add_message(self, user_id: str, message: str, role: str = "user", metadata: Optional[Dict] = None):
+        # Apply semantic filter before storage
+        if not self._should_persist(message):
+            logger.debug(f"Semantic filter rejected message for user {user_id}")
             return None
 
         try:
             # Log what we're sending to mem0
             logger.debug(f"Adding memory for user={user_id}, role={role}, content_length={len(message)}, content_preview='{message[:100]}'")
             
-            # mem0 expects messages list objects
-            result = self.memory.add(messages=[{"role": role, "content": message}], user_id=user_id, metadata=metadata or {})
+            # Add metadata tag for filtered retrieval
+            enriched_metadata = metadata or {}
+            enriched_metadata["content_type"] = "user_message"
             
-            # Log mem0's response
+            # mem0 v1.0: async_mode=True by default, output_format="v1.1" by default
+            result = self.memory.add(
+                messages=[{"role": role, "content": message}],
+                user_id=user_id,
+                metadata=enriched_metadata
+            )
+            
+            # v1.1 format: result is {"results": [...]}
             if result and isinstance(result, dict) and result.get('results'):
                 logger.debug(f"mem0 add result: {len(result['results'])} memories added")
             elif result and isinstance(result, dict) and 'results' in result and not result['results']:
@@ -202,13 +267,14 @@ class Mem0MemoryManager:
             metadata: Optional metadata (e.g., chat_id, timestamp)
             
         Returns:
-            mem0 result dict or None if validation fails or deduplication occurs
+            mem0 result dict (v1.1 format: {"results": [...]}) or None if filtered/failed
         """
-        # Validate both messages upfront
-        if not user_message or not user_message.strip() or len(user_message.strip()) < 3:
-            logger.debug(f"Invalid user message for user {user_id}: too short or empty")
+        # Apply semantic filter to user message
+        if not self._should_persist(user_message):
+            logger.debug(f"Semantic filter rejected conversation pair for user {user_id}")
             return None
             
+        # Validate assistant message (less strict - no semantic filter)
         if not assistant_message or not assistant_message.strip() or len(assistant_message.strip()) < 3:
             logger.debug(f"Invalid assistant message for user {user_id}: too short or empty")
             return None
@@ -216,19 +282,25 @@ class Mem0MemoryManager:
         try:
             logger.debug(f"Adding conversation pair for user={user_id}, user_msg='{user_message[:50]}...', assistant_msg='{assistant_message[:50]}...'")
             
+            # Add metadata tags for filtered retrieval
+            enriched_metadata = metadata or {}
+            enriched_metadata["content_type"] = "conversation"
+            enriched_metadata["interaction_type"] = "chat_exchange"
+            
             # Store conversation pair in single call
             conversation = [
                 {"role": "user", "content": user_message},
                 {"role": "assistant", "content": assistant_message}
             ]
             
+            # mem0 v1.0: async_mode=True by default (non-blocking), output_format="v1.1" by default
             result = self.memory.add(
                 messages=conversation,
                 user_id=user_id,
-                metadata=metadata or {}
+                metadata=enriched_metadata
             )
             
-            # Log result at debug level
+            # v1.1 format: result is {"results": [...]}
             if result and isinstance(result, dict) and result.get('results'):
                 logger.debug(f"mem0 stored conversation pair: {len(result['results'])} memories extracted")
             elif result and isinstance(result, dict) and 'results' in result and not result['results']:
@@ -255,11 +327,16 @@ class Mem0MemoryManager:
         try:
             logger.debug(f"Searching memory for user={user_id}, query='{query[:100]}', limit={limit}")
             result = self.memory.search(query=query, user_id=user_id, limit=limit)
-            logger.debug(f"mem0 search returned {len(result) if result else 0} results")
+            
+            # v1.1 format: result is {"results": [...]}
+            if result and isinstance(result, dict) and 'results' in result:
+                logger.debug(f"mem0 search returned {len(result['results'])} results")
+            else:
+                logger.debug(f"mem0 search returned: {result}")
             return result
         except Exception:
             logger.exception("Memory search failed")
-            return []
+            return {"results": []}  # Return v1.1 format on error
 
     def get_all(self, user_id: str):
         try:

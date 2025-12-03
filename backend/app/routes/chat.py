@@ -165,9 +165,12 @@ async def chat_stream(
             if payload.useMemory:
                 try:
                     logger.info(f"Querying Mem0 for user_id={payload.userId}")
+                    
+                    # Mem0 v1.0 uses internal ThreadPoolExecutor which deadlocks when wrapped in run_in_threadpool
+                    # Call directly - Mem0 handles its own async execution
                     relevant_memories = mem0_manager.search_memory(
-                        user_id=payload.userId, 
-                        query=payload.message, 
+                        user_id=payload.userId,
+                        query=payload.message,
                         limit=5
                     )
                     
@@ -269,44 +272,43 @@ async def chat_stream(
                 logger.exception("Failed to save assistant response to database")
                 session.rollback()
 
-            # 6. Store conversation in memory for future context (async, non-blocking)
+            # 6. Store conversation in memory for future context (mem0 v1.0 handles async internally)
             if payload.useMemory:
-                async def store_memories_background():
-                    """Background task to store memories without blocking response"""
-                    try:
-                        # Store conversation pair - Mem0 analyzes full exchange for facts
-                        if payload.message and payload.message.strip() and full_response and full_response.strip():
-                            logger.debug(f"Storing conversation pair: user='{payload.message[:100]}', assistant='{full_response[:100]}'")
-                            
-                            # Mem0 expects messages array for context analysis
-                            conversation = [
-                                {"role": "user", "content": payload.message},
-                                {"role": "assistant", "content": full_response}
-                            ]
-                            
-                            await run_in_threadpool(
-                                mem0_manager.add_conversation_pair,
-                                user_message=payload.message,
-                                assistant_message=full_response,
-                                user_id=payload.userId,
-                                metadata={"chat_id": payload.chatId}
-                            )
-                            logger.debug(f"Successfully stored conversation pair in memory (chat: {payload.chatId})")
+                try:
+                    # Store conversation pair - Mem0 v1.0 with async_mode=True (default) handles non-blocking
+                    if payload.message and payload.message.strip() and full_response and full_response.strip():
+                        logger.debug(f"Storing conversation pair: user='{payload.message[:100]}', assistant='{full_response[:100]}'")
+                        
+                        # mem0 v1.0 async_mode=True: Returns immediately, processes in background
+                        # No need for run_in_threadpool or asyncio.create_task wrappers
+                        result = mem0_manager.add_conversation_pair(
+                            user_message=payload.message,
+                            assistant_message=full_response,
+                            user_id=payload.userId,
+                            metadata={
+                                "chat_id": payload.chatId,
+                                "timestamp": datetime.now(timezone.utc).isoformat()
+                            }
+                        )
+                        
+                        # v1.1 format: result is {"results": [...]} or None if filtered
+                        if result and isinstance(result, dict) and result.get('results'):
+                            logger.debug(f"Successfully queued {len(result['results'])} memories for storage (chat: {payload.chatId})")
+                        elif result is None:
+                            logger.debug(f"Memory storage skipped by semantic filter (chat: {payload.chatId})")
                         else:
-                            logger.warning(f"Skipping memory storage: messages too short or empty")
-                            
-                    except ValueError as e:
-                        # Mem0 raises ValueError when facts already known (deduplication)
-                        if "empty" in str(e).lower():
-                            logger.debug("Mem0 skipped storage (duplicate/NOOP) - all facts already known")
-                        else:
-                            logger.error(f"Memory storage ValueError: {str(e)}")
-                    except Exception as mem_error:
-                        logger.error(f"Memory storage failed for chat {payload.chatId}: {type(mem_error).__name__}: {str(mem_error)}")
-                        logger.exception("Full memory storage error traceback:")
-                
-                # Fire and forget - don't wait for memory storage
-                asyncio.create_task(store_memories_background())
+                            logger.debug(f"Memory storage result: {result}")
+                    else:
+                        logger.warning(f"Skipping memory storage: messages too short or empty")
+                        
+                except ValueError as e:
+                    # Mem0 raises ValueError when facts already known (deduplication)
+                    if "empty" in str(e).lower():
+                        logger.debug("Mem0 skipped storage (duplicate/NOOP) - all facts already known")
+                    else:
+                        logger.error(f"Memory storage ValueError: {str(e)}")
+                except Exception as mem_error:
+                    logger.error(f"Memory storage failed for chat {payload.chatId}: {type(mem_error).__name__}: {str(mem_error)}")
 
         except Exception as e:
             logger.exception("Chat streaming error")

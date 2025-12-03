@@ -20,7 +20,7 @@ langchain-text-splitters>=0.0.1
 chromadb>=0.3.28
 
 # Memory System
-mem0ai>=0.1.0
+mem0ai==1.0.1
 
 # Document Processing
 PyPDF2>=3.0.0
