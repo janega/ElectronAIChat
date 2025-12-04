@@ -123,6 +123,29 @@ class Mem0MemoryManager:
                     "ollama_base_url": OLLAMA_HOST,
                 }
             }
+        elif PROVIDER == "llamacpp":
+            # For llamacpp, fallback to ollama for mem0 (mem0 doesn't support llamacpp directly)
+            # Use ollama as a workaround - users should have ollama installed for mem0 to work
+            logger.warning("LlamaCpp provider selected, but mem0 doesn't support it directly.")
+            logger.warning("Falling back to Ollama for memory extraction. Ensure Ollama is running.")
+            config["llm"] = {
+                "provider": "ollama",
+                "config": {
+                    "model": "llama2:latest",  # Use a small model for memory extraction
+                    "temperature": 0.1,
+                    "max_tokens": 250,
+                    "ollama_base_url": OLLAMA_HOST,
+                    "top_p": 0.2,
+                    "top_k": 10,
+                }
+            }
+            config["embedder"] = {
+                "provider": "ollama",
+                "config": {
+                    "model": "nomic-embed-text:latest",
+                    "ollama_base_url": OLLAMA_HOST,
+                }
+            }
         else:
             # OpenAI configuration
             config["llm"] = {

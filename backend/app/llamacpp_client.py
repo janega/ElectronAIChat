@@ -359,7 +359,8 @@ class LlamaCppEmbeddingManager:
     """
     Embedding manager compatible with LangChainEmbeddingManager interface.
     
-    Wraps LlamaCppClient for use in RAG pipelines.
+    Wraps LlamaCppClient for use in RAG pipelines and ChromaDB integration.
+    Implements the same interface as LangChainEmbeddingManager for seamless provider switching.
     """
     
     def __init__(self, client: LlamaCppClient):
@@ -371,7 +372,127 @@ class LlamaCppEmbeddingManager:
         """
         self.client = client
         self.provider = "llamacpp"
+        
+        # Create embeddings wrapper for ChromaDB compatibility
+        self.embeddings = LlamaCppEmbeddingFunction(client)
+        
+        # Text splitter (same as LangChainEmbeddingManager)
+        try:
+            from langchain_text_splitters import RecursiveCharacterTextSplitter
+            self.text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=500,
+                chunk_overlap=50,
+                length_function=len,
+                separators=["\n\n", "\n", " ", ""]
+            )
+        except ImportError:
+            logger.warning("langchain-text-splitters not available")
+            self.text_splitter = None
+        
         logger.info("LlamaCpp embedding manager initialized")
+    
+    def create_vectorstore(self, chat_id: str):
+        """
+        Create or open a Chroma vectorstore for the chat.
+        
+        Compatible with LangChainEmbeddingManager interface.
+        
+        Args:
+            chat_id: Chat identifier for the collection
+            
+        Returns:
+            Chroma vectorstore instance
+        """
+        try:
+            from langchain_community.vectorstores import Chroma
+            from pathlib import Path
+            from app.config import CHROMA_DIR
+        except ImportError:
+            raise RuntimeError("Chroma vectorstore not available. Install chromadb.")
+        
+        persist_directory = str(Path(CHROMA_DIR) / chat_id)
+        logger.info(f"Creating ChromaDB vectorstore at: {persist_directory}")
+        
+        try:
+            vectorstore = Chroma(
+                collection_name=f"chat_{chat_id}",
+                embedding_function=self.embeddings,
+                persist_directory=persist_directory
+            )
+            return vectorstore
+        except TypeError:
+            # Fallback for alternate interface
+            vectorstore = Chroma(
+                embedding_function=self.embeddings,
+                persist_directory=persist_directory
+            )
+            return vectorstore
+    
+    async def add_document(self, chat_id: str, text: str, metadata: Dict[str, Any]) -> int:
+        """
+        Chunk text and add to vectorstore.
+        
+        Compatible with LangChainEmbeddingManager interface.
+        
+        Args:
+            chat_id: Chat identifier
+            text: Document text to add
+            metadata: Document metadata
+            
+        Returns:
+            Number of chunks added
+        """
+        from fastapi.concurrency import run_in_threadpool
+        from langchain_core.documents import Document as LangChainDocument
+        
+        if self.text_splitter is None:
+            raise RuntimeError("Text splitter not available")
+        
+        chunks = self.text_splitter.split_text(text)
+        documents = [
+            LangChainDocument(page_content=chunk, metadata={**metadata, "chunk_index": i})
+            for i, chunk in enumerate(chunks)
+        ]
+        
+        vectorstore = await run_in_threadpool(self.create_vectorstore, chat_id)
+        
+        try:
+            await run_in_threadpool(vectorstore.add_documents, documents)
+            await run_in_threadpool(vectorstore.persist)
+        except Exception:
+            logger.exception("Failed to add documents to vectorstore")
+            raise
+        
+        return len(documents)
+    
+    async def search_documents(self, chat_id: str, query: str, k: int = 3) -> List[Dict[str, Any]]:
+        """
+        Similarity search in vectorstore.
+        
+        Compatible with LangChainEmbeddingManager interface.
+        
+        Args:
+            chat_id: Chat identifier
+            query: Search query
+            k: Number of results to return
+            
+        Returns:
+            List of search results with content, metadata, and score
+        """
+        from fastapi.concurrency import run_in_threadpool
+        
+        vectorstore = await run_in_threadpool(self.create_vectorstore, chat_id)
+        
+        try:
+            results = await run_in_threadpool(vectorstore.similarity_search_with_score, query, k)
+        except Exception:
+            logger.exception("Similarity search failed")
+            raise
+        
+        return [
+            {"content": doc.page_content, "metadata": doc.metadata, "score": float(score)}
+            for doc, score in results
+        ]
     
     async def embed_texts(self, texts: List[str]) -> List[List[float]]:
         """
@@ -404,3 +525,52 @@ class LlamaCppEmbeddingManager:
             "provider": "llamacpp",
             "model": self.client.get_model_info()["embedding_model"],
         }
+
+
+class LlamaCppEmbeddingFunction:
+    """
+    Embedding function wrapper for ChromaDB compatibility.
+    
+    ChromaDB expects a callable with __call__ method that takes a list of texts
+    and returns a list of embeddings.
+    """
+    
+    def __init__(self, client: LlamaCppClient):
+        """
+        Initialize embedding function with LlamaCpp client.
+        
+        Args:
+            client: Initialized LlamaCppClient instance
+        """
+        self.client = client
+    
+    def __call__(self, texts: List[str]) -> List[List[float]]:
+        """
+        Synchronous embedding generation for ChromaDB.
+        
+        ChromaDB calls this synchronously, so we need to run async code in sync context.
+        
+        Args:
+            texts: List of text strings
+            
+        Returns:
+            List of embedding vectors
+        """
+        import asyncio
+        
+        # Run async embedding generation in sync context
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(self.client.create_embeddings(texts))
+    
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """LangChain embeddings interface - embed multiple documents."""
+        return self(texts)
+    
+    def embed_query(self, text: str) -> List[float]:
+        """LangChain embeddings interface - embed single query."""
+        return self([text])[0]
