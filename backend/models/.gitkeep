@@ -1,0 +1,2 @@
+# This directory stores GGUF model files for LlamaCpp provider
+# Run: python scripts/download_models.py

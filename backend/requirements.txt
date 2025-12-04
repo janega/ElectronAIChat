@@ -36,3 +36,9 @@ openai
 python-dotenv
 numpy
 tqdm
+
+# LlamaCpp support
+llama-cpp-python>=0.2.0
+
+# Optional: For downloading models from HuggingFace
+huggingface-hub>=0.19.0
