@@ -155,7 +155,29 @@ async def lifespan(app: FastAPI):
     
     # Initialize shared managers (single instances)
     try:
-        langchain_manager = LangChainEmbeddingManager(provider=PROVIDER)
+        if PROVIDER == "llamacpp":
+            # For llamacpp, use lazy initialization via dependencies
+            # This avoids import errors if llama-cpp-python is not installed
+            logger.info("LlamaCpp provider selected - using lazy initialization")
+            langchain_manager = None  # Will be lazy-loaded
+            openai_client = None  # Will be lazy-loaded
+        else:
+            # Standard initialization for ollama/openai
+            langchain_manager = LangChainEmbeddingManager(provider=PROVIDER)
+            
+            # Initialize OpenAI client based on provider
+            if PROVIDER == "ollama":
+                openai_client = EnhancedOpenAIClient(
+                    base_url=OLLAMA_HOST,
+                    api_key="ollama",
+                    provider="ollama"
+                )
+            else:
+                openai_client = EnhancedOpenAIClient(
+                    base_url="https://api.openai.com/v1",
+                    api_key=OPENAI_API_KEY,
+                    provider="openai"
+                )
     except Exception as e:
         logger.error(f"Failed to initialize LangChain manager: {e}")
         if PROVIDER == "ollama" and not any(err["component"] == "ollama" for err in startup_errors):
@@ -163,24 +185,6 @@ async def lifespan(app: FastAPI):
         raise
     
     mem0_manager = Mem0MemoryManager()
-    
-    # Initialize OpenAI client based on provider
-    try:
-        if PROVIDER == "ollama":
-            openai_client = EnhancedOpenAIClient(
-                base_url=OLLAMA_HOST,
-                api_key="ollama",
-                provider="ollama"
-            )
-        else:
-            openai_client = EnhancedOpenAIClient(
-                base_url="https://api.openai.com/v1",
-                api_key=OPENAI_API_KEY,
-                provider="openai"
-            )
-    except Exception as e:
-        logger.error(f"Failed to initialize LLM client: {e}")
-        raise
     
     # Set up dependency injection for managers
     dependencies.set_managers(
