@@ -40,7 +40,7 @@ async def test_chat_stream_basic(
         yield {"token": "world!", "done": False}
         yield {"token": "", "done": True}
     
-    mock_openai_client.create_chat_completion = AsyncMock(return_value=mock_stream())
+    mock_openai_client.create_chat_completion = AsyncMock(side_effect=mock_stream)
     
     with patch.object(dependencies, 'get_langchain_manager', return_value=mock_langchain_manager):
         with patch.object(dependencies, 'get_mem0_manager', return_value=mock_mem0_manager):
@@ -80,7 +80,7 @@ async def test_chat_stream_message_persistence(
         yield {"token": "Response", "done": False}
         yield {"token": "", "done": True}
     
-    mock_openai_client.create_chat_completion = AsyncMock(return_value=mock_stream())
+    mock_openai_client.create_chat_completion = AsyncMock(side_effect=mock_stream)
     
     initial_message_count = len(session.exec(select(Message)).all())
     
@@ -136,7 +136,7 @@ async def test_chat_stream_with_rag_context(
         yield {"token": "Response with RAG", "done": False}
         yield {"token": "", "done": True}
     
-    mock_openai_client.create_chat_completion = AsyncMock(return_value=mock_stream())
+    mock_openai_client.create_chat_completion = AsyncMock(side_effect=mock_stream)
     
     with patch.object(dependencies, 'get_langchain_manager', return_value=mock_langchain_manager):
         with patch.object(dependencies, 'get_mem0_manager', return_value=mock_mem0_manager):
@@ -185,7 +185,7 @@ async def test_chat_stream_with_memory_context(
         yield {"token": "Response with memory", "done": False}
         yield {"token": "", "done": True}
     
-    mock_openai_client.create_chat_completion = AsyncMock(return_value=mock_stream())
+    mock_openai_client.create_chat_completion = AsyncMock(side_effect=mock_stream)
     
     with patch.object(dependencies, 'get_langchain_manager', return_value=mock_langchain_manager):
         with patch.object(dependencies, 'get_mem0_manager', return_value=mock_mem0_manager):
@@ -233,7 +233,7 @@ async def test_chat_stream_uses_user_settings(
         yield {"token": "Response", "done": False}
         yield {"token": "", "done": True}
     
-    mock_openai_client.create_chat_completion = AsyncMock(return_value=mock_stream())
+    mock_openai_client.create_chat_completion = AsyncMock(side_effect=mock_stream)
     
     with patch.object(dependencies, 'get_langchain_manager', return_value=mock_langchain_manager):
         with patch.object(dependencies, 'get_mem0_manager', return_value=mock_mem0_manager):
@@ -275,7 +275,7 @@ async def test_chat_stream_auto_creates_chat(
         yield {"token": "Response", "done": False}
         yield {"token": "", "done": True}
     
-    mock_openai_client.create_chat_completion = AsyncMock(return_value=mock_stream())
+    mock_openai_client.create_chat_completion = AsyncMock(side_effect=mock_stream)
     
     new_chat_id = "new-chat-id-12345"
     
@@ -316,7 +316,7 @@ async def test_chat_stream_with_invalid_chat_id(
         yield {"token": "Response", "done": False}
         yield {"token": "", "done": True}
     
-    mock_openai_client.create_chat_completion = AsyncMock(return_value=mock_stream())
+    mock_openai_client.create_chat_completion = AsyncMock(side_effect=mock_stream)
     
     with patch.object(dependencies, 'get_langchain_manager', return_value=mock_langchain_manager):
         with patch.object(dependencies, 'get_mem0_manager', return_value=mock_mem0_manager):

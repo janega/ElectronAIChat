@@ -176,10 +176,8 @@ def mock_openai_client():
             yield {"token": token, "done": False}
         yield {"token": "", "done": True}
     
-    mock_client.create_chat_completion = AsyncMock(return_value=mock_stream())
-    
-    # Make sure the async generator is callable
-    mock_client.create_chat_completion.return_value = mock_stream()
+    # Use side_effect for async generator to ensure proper mocking
+    mock_client.create_chat_completion = AsyncMock(side_effect=mock_stream)
     
     return mock_client
 
