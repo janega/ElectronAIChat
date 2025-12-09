@@ -254,6 +254,73 @@ yield f"data: {json.dumps({'token': '', 'done': True, 'sources': [...]})}\n\n"
 - `GET /api/admin/data-locations` - Get storage paths
 - `GET /api/admin/has-data` - Check if data exists
 
+## Testing
+
+Comprehensive test suite for backend with pytest, pytest-asyncio, and FastAPI TestClient.
+
+### Running Tests
+
+```bash
+# Quick run (all tests)
+cd backend
+./run_tests.sh         # Linux/macOS
+run_tests.bat         # Windows
+
+# Unit tests only
+./run_tests.sh unit
+
+# Integration tests only
+./run_tests.sh integration
+
+# With HTML coverage report
+./run_tests.sh coverage
+
+# CI mode (fail fast)
+./run_tests.sh ci
+```
+
+### Test Structure
+
+- **Unit Tests** (`tests/unit/`): 58 tests covering models, schemas, managers, and utilities
+- **Integration Tests** (`tests/integration/`): API endpoint tests with mocked dependencies
+- **Fixtures** (`conftest.py`): Shared database, mock managers, and test clients
+- **Coverage**: Currently 27% with focus on core business logic
+
+### Test Categories
+
+| Category | File | Tests | Coverage |
+|----------|------|-------|----------|
+| Database Models | `test_database.py` | 14 | SQLModel validation, relationships |
+| Pydantic Schemas | `test_schemas.py` | 14 | Type checking, serialization |
+| LangChain Manager | `test_embeddings.py` | 11 | Embedding generation, text splitting |
+| Memory Manager | `test_memory.py` | 11 | Mem0 operations, deduplication |
+| Utilities | `test_utils.py` | 8 | Ollama health, server management |
+| Health Endpoint | `test_routes_health.py` | 1+ | Component status, validation |
+
+### Adding Tests
+
+```python
+# Unit test example
+def test_user_creation(session: Session):
+    """Test creating a user with validation."""
+    user = User(username="testuser", email="test@example.com")
+    session.add(user)
+    session.commit()
+    
+    assert user.id is not None
+    assert user.username == "testuser"
+
+# Integration test example
+@pytest.mark.asyncio
+async def test_health_check(async_client: AsyncClient):
+    """Test health check endpoint."""
+    response = await async_client.get("/api/health")
+    assert response.status_code == 200
+    assert "status" in response.json()
+```
+
+For detailed testing documentation, see [`backend/tests/README.md`](backend/tests/README.md).
+
 ## Troubleshooting
 
 ### Backend Won't Start
