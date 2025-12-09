@@ -201,11 +201,19 @@ def mock_ollama_health():
 # ============================================================================
 
 @pytest.fixture
-async def test_app():
+def test_app(mock_langchain_manager, mock_mem0_manager, mock_openai_client):
     """Create a test FastAPI app instance with mocked dependencies."""
     # Import app after setting up test environment
     os.environ["USE_APP_DATA_DIR"] = "false"
     os.environ["LLM_PROVIDER"] = "ollama"
+    
+    # Set up mock managers in dependencies module
+    from app.routes import dependencies
+    dependencies.set_managers(
+        langchain_manager=mock_langchain_manager,
+        mem0_manager=mock_mem0_manager,
+        openai_client=mock_openai_client
+    )
     
     # We need to import the app in a way that doesn't trigger startup
     # For now, we'll use a simplified approach
@@ -223,6 +231,9 @@ async def test_app():
         allow_headers=["*"],
     )
     
+    # Initialize app state for health checks
+    app.state.startup_errors = []
+    
     # Include routers
     app.include_router(health_router)
     app.include_router(chat_router)
@@ -231,11 +242,25 @@ async def test_app():
 
 
 @pytest.fixture
-async def async_client(test_app) -> AsyncGenerator[AsyncClient, None]:
+async def async_client(test_app, session) -> AsyncGenerator[AsyncClient, None]:
     """Create an async HTTP client for testing."""
+    # Override get_session dependency
+    from app.routes import dependencies
+    from app.db_manager import get_session as real_get_session
+    
+    # Create a custom dependency override
+    def override_get_session():
+        return session
+    
+    # Store original and override
+    test_app.dependency_overrides[real_get_session] = override_get_session
+    
     transport = ASGITransport(app=test_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+    
+    # Clean up
+    test_app.dependency_overrides.clear()
 
 
 # ============================================================================

@@ -26,10 +26,7 @@ async def test_health_check_success(
     mock_langchain_manager
 ):
     """Test successful health check with all components healthy."""
-    # Override dependencies for this test
-    with patch.object(dependencies, 'get_langchain_manager', return_value=mock_langchain_manager):
-        with patch.object(dependencies, 'get_session', return_value=session):
-            response = await async_client.get("/api/health")
+    response = await async_client.get("/api/health")
     
     assert response.status_code == 200
     data = response.json()
