@@ -38,7 +38,14 @@ numpy
 tqdm
 
 # LlamaCpp support
-llama-cpp-python>=0.2.0
+# Install manually with GPU support if needed:
+#   CPU:  pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+#   CUDA: pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+llama-cpp-python==0.3.2
 
 # Optional: For downloading models from HuggingFace
 huggingface-hub>=0.19.0
+
+
+

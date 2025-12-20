@@ -123,7 +123,7 @@ class LlamaCppClient:
     
     def _get_chat_llm(self) -> Llama:
         """
-        Lazy-load chat model on first use.
+        Lazy-load chat model on first use (internal).
         
         Returns:
             Initialized Llama instance for chat completions
@@ -146,6 +146,15 @@ class LlamaCppClient:
             logger.info("Chat model loaded successfully")
         
         return self._chat_llm
+    
+    def get_chat_llm(self) -> Llama:
+        """
+        Public API to get chat LLM instance.
+        
+        Returns:
+            Initialized Llama instance for chat completions
+        """
+        return self._get_chat_llm()
     
     def _get_embedding_llm(self) -> Llama:
         """

@@ -15,6 +15,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
+from pydantic import field_validator
 
 
 # ============================================================================
@@ -49,6 +50,7 @@ class UserSettings(SQLModel, table=True):
     user_id: str = Field(foreign_key="users.id", unique=True, index=True)
     
     # LLM Settings
+    provider: str = Field(default="auto")
     default_model: str = Field(default="llama2")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2048, ge=1, le=4096)
@@ -57,7 +59,7 @@ class UserSettings(SQLModel, table=True):
     system_prompt: str = Field(default="You are a helpful assistant.")
     
     # App Settings
-    theme: str = Field(default="light")  # light or dark
+    theme: str = Field(default="light")
     use_memory: bool = Field(default=True)
     use_mcp: bool = Field(default=True)
     
@@ -65,6 +67,24 @@ class UserSettings(SQLModel, table=True):
     
     # Relationships
     user: User = Relationship(back_populates="settings")
+    
+    @field_validator("provider")
+    @classmethod
+    def validate_provider(cls, v: str) -> str:
+        """Validate provider is one of the allowed values"""
+        allowed = ["auto", "ollama", "llamacpp", "openai"]
+        if v not in allowed:
+            raise ValueError(f"provider must be one of {allowed}, got: {v}")
+        return v
+    
+    @field_validator("theme")
+    @classmethod
+    def validate_theme(cls, v: str) -> str:
+        """Validate theme is one of the allowed values"""
+        allowed = ["light", "dark"]
+        if v not in allowed:
+            raise ValueError(f"theme must be one of {allowed}, got: {v}")
+        return v
 
 
 class Chat(SQLModel, table=True):
@@ -159,6 +179,7 @@ class UserResponse(SQLModel):
 
 class SettingsUpdate(SQLModel):
     """Request model for updating settings"""
+    provider: Optional[str] = None  # auto, ollama, llamacpp, openai
     default_model: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None

@@ -19,6 +19,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from dotenv import load_dotenv
 
+# Load environment variables BEFORE importing config
+# This ensures .env values are available when config.py runs
+load_dotenv()
+
 from app.config import (
     APP_NAME, PROVIDER, OLLAMA_HOST, OPENAI_API_KEY, 
     ALLOW_ORIGINS, DATABASE_PATH, BASE_DIR, LOGS_DIR, IS_PACKAGED,
@@ -39,9 +43,7 @@ from app.routes.documents import router as documents_router
 from app.routes.chats import router as chats_router
 from app.routes.users import router as users_router
 from app.routes.admin import router as admin_router
-
-# Load environment variables
-load_dotenv()
+from app.routes.llamacpp_api import router as llamacpp_api_router
 
 # Use the logger from config
 logger = cfg_logger
@@ -53,49 +55,85 @@ async def lifespan(app: FastAPI):
     Manage application lifecycle events (startup/shutdown).
     Replaces deprecated @app.on_event decorators.
     """
+    # Import config to modify PROVIDER global
+    import app.config as config_module
+    from app.utils import detect_available_provider
+    
     # Startup: Initialize database and managers
     logger.info("=" * 80)
     logger.info("ElectronAIChat Backend Starting")
     logger.info(f"Packaged: {IS_PACKAGED}")
     logger.info(f"Base Directory: {BASE_DIR}")
     logger.info(f"Logs Directory: {LOGS_DIR}")
-    logger.info(f"LLM Provider: {PROVIDER}")
+    
+    # Runtime provider detection with fallback logic
+    logger.info("=" * 80)
+    logger.info("🔍 Detecting available LLM provider...")
+    
+    preferred_provider = None if config_module.PROVIDER_ENV == "auto" else config_module.PROVIDER_ENV
+    
+    if preferred_provider:
+        logger.info(f"   User preference: {preferred_provider}")
+    else:
+        logger.info("   Auto-detection enabled (Ollama → llamacpp → OpenAI)")
+    
+    detection_result = await detect_available_provider(preferred_provider)
+    
+    # Update global PROVIDER with detected value
+    detected_provider = detection_result["provider"]
+    config_module.PROVIDER = detected_provider
+    
+    # Store Ollama process reference if we started it during detection
+    ollama_process_ref = detection_result.get("process")
+    
+    # Re-import to get updated PROVIDER in local scope
+    from app.config import PROVIDER
+    
+    logger.info(f"✅ Active LLM Provider: {PROVIDER}")
+    logger.info(f"   Reason: {detection_result['reason']}")
+    
+    if detection_result.get("models"):
+        logger.info(f"   Available models: {len(detection_result['models'])}")
     
     # Validate provider configuration
     startup_errors = []
+    
+    logger.info("=" * 80)
     
     if PROVIDER == "ollama":
         logger.info(f"Ollama Host: {OLLAMA_HOST}")
         logger.info(f"Ollama LLM Model: {DEFAULT_OLLAMA_LLM_MODEL}")
         logger.info(f"Ollama Embed Model: {DEFAULT_OLLAMA_EMBED_MODEL}")
         logger.info("=" * 80)
-        logger.info("Checking Ollama service...")
         
-        # Check if Ollama is running, start as independent process if needed
-        from app.utils import ensure_ollama_running
-        ollama_status = await ensure_ollama_running(OLLAMA_HOST)
+        # Ollama was already started during detection, just verify models
+        if detection_result.get("started_by_us"):
+            logger.info("✅ Ollama started successfully during detection")
+        else:
+            logger.info("✅ Ollama already running")
         
-        if not ollama_status["running"]:
-            error_msg = f"Ollama could not be started: {ollama_status['error']}"
+        if not detection_result.get("available"):
+            error_msg = "Ollama could not be started or verified"
             logger.error(f"{error_msg}")
             startup_errors.append({
                 "component": "ollama",
                 "message": error_msg,
                 "suggestion": "Install Ollama from https://ollama.ai or start it manually with: ollama serve"
             })
+            app.state.ollama_process = None
         else:
-            # Ollama is running - verify required models are available
-            if ollama_status["started_by_us"]:
+            # Ollama is running - store process reference if we started it
+            if detection_result.get("started_by_us"):
                 logger.info("✅ Started Ollama as independent background service")
                 logger.info("   Ollama will be stopped when backend exits")
                 # Store process reference for cleanup on shutdown
-                app.state.ollama_process = ollama_status.get("process")
+                app.state.ollama_process = detection_result.get("process")
             else:
                 logger.info("✅ Ollama service is already running")
                 app.state.ollama_process = None  # Don't kill processes we didn't start
             
             # Check for exact version match
-            available_models = ollama_status.get("models", [])
+            available_models = detection_result.get("models", [])
             required_models = [DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OLLAMA_EMBED_MODEL]
             missing_models = [m for m in required_models if m not in available_models]
             
@@ -109,15 +147,61 @@ async def lifespan(app: FastAPI):
                     "suggestion": f"Pull missing models: {' and '.join([f'ollama pull {m}' for m in missing_models])}"
                 })
             else:
-                logger.info(f"All required Ollama models available: {required_models}")
+                logger.info(f"✅ All required Ollama models available: {required_models}")
+    
+    elif PROVIDER == "llamacpp":
+        from app.config import LLAMACPP_MODELS_DIR, LLAMACPP_CHAT_MODEL, LLAMACPP_EMBED_MODEL
+        
+        logger.info(f"Models Directory: {LLAMACPP_MODELS_DIR}")
+        logger.info(f"Chat Model: {LLAMACPP_CHAT_MODEL}")
+        logger.info(f"Embed Model: {LLAMACPP_EMBED_MODEL}")
+        logger.info("=" * 80)
+        logger.info("Verifying LlamaCpp models...")
+        
+        chat_model_path = LLAMACPP_MODELS_DIR / LLAMACPP_CHAT_MODEL
+        embed_model_path = LLAMACPP_MODELS_DIR / LLAMACPP_EMBED_MODEL
+        
+        if not chat_model_path.exists():
+            error_msg = f"LlamaCpp chat model not found: {chat_model_path}"
+            logger.error(f"❌ {error_msg}")
+            startup_errors.append({
+                "component": "llamacpp_chat_model",
+                "message": error_msg,
+                "suggestion": "Run: python scripts/download_models.py"
+            })
+        else:
+            logger.info(f"✅ Chat model found: {chat_model_path.name}")
+        
+        if not embed_model_path.exists():
+            error_msg = f"LlamaCpp embed model not found: {embed_model_path}"
+            logger.error(f"❌ {error_msg}")
+            startup_errors.append({
+                "component": "llamacpp_embed_model",
+                "message": error_msg,
+                "suggestion": "Run: python scripts/download_models.py"
+            })
+        else:
+            logger.info(f"✅ Embed model found: {embed_model_path.name}")
+        
+        # Check if Ollama is available for Mem0 (optional but recommended)
+        from app.utils import check_ollama_health
+        ollama_status = await check_ollama_health(OLLAMA_HOST, timeout=2.0)
+        
+        logger.info("ℹ️  LlamaCpp will use internal OpenAI-compatible endpoints for Mem0")
+        logger.info("   Endpoints: /v1/completions, /v1/embeddings")
+        logger.info("   Mem0 will use custom provider factories (LlmFactory, EmbeddingFactory)")
+        
+        app.state.ollama_process = None  # No Ollama process to manage
     
     elif PROVIDER == "openai":
         logger.info(f"OpenAI LLM Model: {DEFAULT_OPENAI_LLM_MODEL}")
         logger.info(f"OpenAI Embed Model: {DEFAULT_OPENAI_EMBED_MODEL}")
+        logger.info("=" * 80)
+        logger.info("Verifying OpenAI API key...")
         
         if not OPENAI_API_KEY or OPENAI_API_KEY == "":
             error_msg = "OPENAI_API_KEY is not set in environment"
-            logger.error(f"{error_msg}")
+            logger.error(f"❌ {error_msg}")
             startup_errors.append({
                 "component": "openai_api_key",
                 "message": error_msg,
@@ -125,15 +209,18 @@ async def lifespan(app: FastAPI):
             })
         else:
             logger.info("✅ OpenAI API key configured")
+        
+        app.state.ollama_process = None  # No Ollama process to manage
     
     else:
         error_msg = f"Unknown provider: {PROVIDER}"
-        logger.error(f"{error_msg}")
+        logger.error(f"❌ {error_msg}")
         startup_errors.append({
             "component": "provider",
             "message": error_msg,
-            "suggestion": "Set LLM_PROVIDER to 'ollama' or 'openai' in .env"
+            "suggestion": "Set LLM_PROVIDER to 'auto', 'ollama', 'llamacpp', or 'openai' in .env"
         })
+        app.state.ollama_process = None
     
     # Log startup validation results
     if startup_errors:
@@ -241,6 +328,9 @@ app.include_router(documents_router)
 app.include_router(chats_router)
 app.include_router(users_router)
 app.include_router(admin_router)
+
+# Register internal llamacpp API (for Mem0 custom provider)
+app.include_router(llamacpp_api_router)
 
 #TODO remove this endpoint later
 # Legacy status endpoint (for backward compatibility with Electron)

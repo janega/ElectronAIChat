@@ -6,7 +6,11 @@ from logging.handlers import RotatingFileHandler
 import sys
 
 # Provider configuration
-PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+# Note: This is the initial env-based setting. Runtime detection happens in main.py
+# using detect_available_provider() which checks Ollama → llamacpp → OpenAI
+# Set LLM_PROVIDER to override auto-detection: "ollama", "llamacpp", "openai", or "auto"
+PROVIDER_ENV = os.getenv("LLM_PROVIDER", "auto").lower()
+PROVIDER = PROVIDER_ENV  # Will be updated by main.py after runtime detection
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
@@ -180,6 +184,7 @@ logger.info(f"LlamaCpp config: provider={PROVIDER}, models_dir={LLAMACPP_MODELS_
 
 # Default settings for new users and fallback when UserSettings missing
 DEFAULT_SETTINGS = {
+    "provider": "auto",  # auto, ollama, llamacpp, openai
     "temperature": 0.7,
     "max_tokens": 2048,
     "top_p": 0.9,
