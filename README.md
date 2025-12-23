@@ -1,11 +1,11 @@
 # ElectronAIChat
 
-A powerful desktop RAG (Retrieval-Augmented Generation) application built with Electron, React, and FastAPI. Chat with AI models (Ollama/OpenAI) with document-based context and long-term memory.
+A powerful desktop RAG (Retrieval-Augmented Generation) application built with Electron, React, and FastAPI. Chat with AI models (Ollama/OpenAI/LlamaCpp) with document-based context and long-term memory.
 
 ## Features
 
 ### ðŸ¤– AI Chat
-- **Multiple LLM Support**: Works with Ollama (local) or OpenAI models
+- **Multiple LLM Support**: Works with Ollama (local), OpenAI (cloud), or LlamaCpp (GGUF models)
 - **Streaming Responses**: Real-time token streaming with Server-Sent Events (SSE)
 - **Conversation History**: SQLite-backed persistent chat storage
 - **Chat Management**: Create, rename, delete, and search through conversations
@@ -60,7 +60,7 @@ graph TB
 **Tech Stack:**
 - **Frontend**: Electron 26, TypeScript, React 19, Vite, TailwindCSS 4
 - **Backend**: FastAPI, ChromaDB, SQLite (SQLModel), Mem0, LangChain
-- **LLM Providers**: Ollama (local), OpenAI (cloud)
+- **LLM Providers**: Ollama (local), OpenAI (cloud), LlamaCpp (GGUF models)
 - **Build Tools**: PyInstaller (backend), electron-builder (packaging)
 
 ## Installation
@@ -68,7 +68,10 @@ graph TB
 ### Prerequisites
 - **Node.js** 18+ (for Electron/React)
 - **Python** 3.10+ (for FastAPI backend)
-- **Ollama** (optional, for local LLM) - [Download](https://ollama.ai)
+- **LLM Provider** (choose one):
+  - **Ollama** (local LLM) - [Download](https://ollama.ai)
+  - **OpenAI API Key** (cloud)
+  - **LlamaCpp** (GGUF models) - See [LlamaCpp Integration Guide](LLAMACPP_INTEGRATION.md)
 - **Poppler** (for PDF processing with OCR) - [Download](https://github.com/oschwaldp/poppler-windows/releases)
 - **Tesseract OCR** (for scanned PDFs) - [Download](https://github.com/tesseract-ocr/tesseract)
 
@@ -88,9 +91,10 @@ pip install -r requirements.txt
 # Copy and configure environment variables
 cp .env.example .env
 # Edit .env to set:
-# - LLM_PROVIDER (ollama or openai)
+# - LLM_PROVIDER (ollama, openai, or llamacpp)
 # - OLLAMA_HOST (if using Ollama)
 # - OPENAI_API_KEY (if using OpenAI)
+# - LLAMACPP_* settings (if using LlamaCpp - see LLAMACPP_INTEGRATION.md)
 # - POPPLER_PATH (path to Poppler bin directory)
 ```
 
@@ -126,13 +130,27 @@ npm run start  # Vite on http://localhost:5173, Electron watches
 
 **Backend** (`.env` in `backend/`):
 ```bash
-LLM_PROVIDER=ollama              # "ollama" or "openai"
+# Choose your LLM provider: "ollama", "openai", or "llamacpp"
+LLM_PROVIDER=ollama
+
+# Ollama configuration (if LLM_PROVIDER=ollama)
 OLLAMA_HOST=http://localhost:11434
 OLLAMA_EMBED_MODEL=nomic-embed-text
 OLLAMA_LLM_MODEL=llama2
-OPENAI_API_KEY=sk-...            # Required if LLM_PROVIDER=openai
+
+# OpenAI configuration (if LLM_PROVIDER=openai)
+OPENAI_API_KEY=sk-...            # Required for OpenAI
 OPENAI_EMBED_MODEL=text-embedding-3-small
 OPENAI_LLM_MODEL=gpt-3.5-turbo
+
+# LlamaCpp configuration (if LLM_PROVIDER=llamacpp)
+# See LLAMACPP_INTEGRATION.md for full setup guide
+LLAMACPP_MODELS_DIR=./models
+LLAMACPP_CHAT_MODEL=qwen3-0.6b-q4.gguf
+LLAMACPP_EMBED_MODEL=nomic-embed-text-q4.gguf
+LLAMACPP_N_GPU_LAYERS=-1         # Auto-detect GPU
+
+# General settings
 USE_APP_DATA_DIR=false           # Override packaged detection
 POPPLER_PATH=C:\path\to\poppler\bin  # For PDF OCR
 ```
@@ -185,7 +203,7 @@ Documents are processed in stages:
 1. **Upload**: Validate size and type
 2. **Extract**: PyPDF2 for text, OCR fallback for scanned PDFs, JSON parsing
 3. **Chunk**: Semantic splitting with `RecursiveCharacterTextSplitter` (500 chars, 50 overlap)
-4. **Embed**: Generate embeddings with Ollama or OpenAI
+4. **Embed**: Generate embeddings with your chosen provider (Ollama/OpenAI/LlamaCpp)
 5. **Store**: Save to ChromaDB with metadata (chatId, userId, filename)
 6. **Query**: Retrieve top-k similar chunks during chat for context injection
 
@@ -322,6 +340,37 @@ ElectronAIChat is **free, open, and hackable.** Run it, fork it, and share it â€
 
 See [LICENSE](LICENSE) for full terms.
 
+## LLM Provider Options
+
+ElectronAIChat supports three LLM providers, each with different tradeoffs:
+
+| Provider | Type | Pros | Cons | Setup |
+|----------|------|------|------|-------|
+| **Ollama** | Local | Free, private, good performance | Requires installation, larger models | [ollama.ai](https://ollama.ai) |
+| **OpenAI** | Cloud | Best quality, fast | Costs per token, requires internet | Get API key |
+| **LlamaCpp** | Local | Smallest models, no dependencies | Slower on CPU, lower quality | [Integration Guide](LLAMACPP_INTEGRATION.md) |
+
+### LlamaCpp Quick Start
+
+For completely offline inference with minimal setup:
+
+```bash
+# 1. Install llama-cpp-python
+cd backend
+pip install llama-cpp-python
+
+# 2. Download models (~490MB)
+python scripts/download_models.py
+
+# 3. Configure provider
+echo "LLM_PROVIDER=llamacpp" >> .env
+
+# 4. Start backend
+python main.py
+```
+
+See [LLAMACPP_INTEGRATION.md](LLAMACPP_INTEGRATION.md) for GPU acceleration, model selection, and advanced configuration.
+
 ## Acknowledgments
 
 - [LangChain](https://github.com/langchain-ai/langchain) - Embeddings and RAG framework
@@ -330,6 +379,7 @@ See [LICENSE](LICENSE) for full terms.
 - [FastAPI](https://github.com/tiangolo/fastapi) - Backend framework
 - [Electron](https://github.com/electron/electron) - Desktop app framework
 - [Ollama](https://ollama.ai) - Local LLM runtime
+- [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) - GGUF model support
 
 ## Support
 

@@ -12,14 +12,14 @@ const ELECTRON_RESOURCES = join(ROOT_DIR, "electron", "dist");
 const DEST_FILE = join(ELECTRON_RESOURCES, "backend.exe");
 
 function run() {
-  console.log(`🔍 Checking for backend binary at: ${BACKEND_DIST}`);
+  console.log(`Checking for backend binary at: ${BACKEND_DIST}`);
 
   if (!existsSync(BACKEND_DIST)) {
-    console.log("⚠️ Backend binary not found.");
+    console.log("Backend binary not found.");
 
     if (existsSync(BACKEND_SRC)) {
-      console.log(`📦 Found backend.spec at ${BACKEND_SRC}`);
-      console.log("➡️  Building with PyInstaller...");
+      console.log(`Found backend.spec at ${BACKEND_SRC}`);
+      console.log("Building with PyInstaller...");
 
       try {
         execSync("pyinstaller backend.spec", {
@@ -27,21 +27,21 @@ function run() {
           stdio: "inherit",
         });
       } catch (err) {
-        console.error("❌ PyInstaller build failed:", err.message);
+        console.error("PyInstaller build failed:", err.message);
         process.exit(1);
       }
 
       if (!existsSync(BACKEND_DIST)) {
-        console.error(`❌ ERROR: PyInstaller did not produce ${BACKEND_DIST}`);
+        console.error(`ERROR: PyInstaller did not produce ${BACKEND_DIST}`);
         process.exit(1);
       }
-      console.log("✅ Successfully built backend.exe");
+      console.log("Successfully built backend.exe");
     } else {
-      console.error("❌ ERROR: Neither back.exe nor backend.spec found.");
+      console.error("ERROR: Neither back.exe nor backend.spec found.");
       process.exit(1);
     }
   } else {
-    console.log("✅ Backend binary found.");
+    console.log("Backend binary found.");
   }
 
   // Ensure resources folder exists
@@ -51,9 +51,9 @@ function run() {
   copyFileSync(BACKEND_DIST, DEST_FILE);
 
   if (existsSync(DEST_FILE)) {
-    console.log(`✅ backend.exe is now in ${DEST_FILE}`);
+    console.log(`backend.exe is now in ${DEST_FILE}`);
   } else {
-    console.error(`❌ ERROR: Failed to copy backend.exe to ${DEST_FILE}`);
+    console.error(`ERROR: Failed to copy backend.exe to ${DEST_FILE}`);
     process.exit(1);
   }
 }

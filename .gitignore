@@ -90,6 +90,10 @@ chroma_db/
 chromadb/
 uploads/
 
+# LlamaCpp models (GGUF files are large)
+backend/models/*.gguf
+backend/models/.cache/
+
 # Redis
 dump.rdb
 *.rdb
