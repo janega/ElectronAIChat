@@ -270,42 +270,51 @@ async def chat_stream(
                 logger.exception("Failed to save assistant response to database")
                 session.rollback()
 
-            # 6. Store conversation in memory for future context (mem0 v1.0 handles async internally)
+            # 6. Store conversation in memory for future context (non-blocking for streaming)
             if payload.useMemory:
                 try:
-                    # Store conversation pair using native async API
+                    # Store conversation pair using fire-and-forget background task
                     if payload.message and payload.message.strip() and full_response and full_response.strip():
-                        logger.debug(f"Storing conversation pair: user='{payload.message[:100]}', assistant='{full_response[:100]}'")
+                        logger.debug(f"Scheduling background memory storage: user='{payload.message[:100]}', assistant='{full_response[:100]}'")
                         
-                        # mem0 v1.0+ native async API - await directly
-                        result = await mem0_manager.add_conversation_pair(
-                            user_message=payload.message,
-                            assistant_message=full_response,
-                            user_id=payload.userId,
-                            metadata={
-                                "chat_id": payload.chatId,
-                                "timestamp": datetime.now(timezone.utc).isoformat()
-                            }
+                        # Define callback to log exceptions from background task
+                        def _mem0_done(task: asyncio.Task):
+                            try:
+                                result = task.result()
+                                # v1.1 format: result is {"results": [...]} or None if filtered
+                                if result and isinstance(result, dict) and result.get('results'):
+                                    logger.debug(f"Background memory storage succeeded: {len(result['results'])} memories (chat: {payload.chatId})")
+                                elif result is None:
+                                    logger.debug(f"Memory storage skipped by semantic filter (chat: {payload.chatId})")
+                                else:
+                                    logger.debug(f"Memory storage result: {result}")
+                            except ValueError as e:
+                                # Mem0 raises ValueError when facts already known (deduplication)
+                                if "empty" in str(e).lower():
+                                    logger.debug("Mem0 skipped storage (duplicate/NOOP) - all facts already known")
+                                else:
+                                    logger.error(f"Memory storage ValueError: {str(e)}")
+                            except Exception:
+                                logger.exception("Mem0 background write failed")
+                        
+                        # Schedule background task
+                        task = asyncio.create_task(
+                            mem0_manager.add_conversation_pair(
+                                user_message=payload.message,
+                                assistant_message=full_response,
+                                user_id=payload.userId,
+                                metadata={
+                                    "chat_id": payload.chatId,
+                                    "timestamp": datetime.now(timezone.utc).isoformat()
+                                }
+                            )
                         )
-                        
-                        # v1.1 format: result is {"results": [...]} or None if filtered
-                        if result and isinstance(result, dict) and result.get('results'):
-                            logger.debug(f"Successfully queued {len(result['results'])} memories for storage (chat: {payload.chatId})")
-                        elif result is None:
-                            logger.debug(f"Memory storage skipped by semantic filter (chat: {payload.chatId})")
-                        else:
-                            logger.debug(f"Memory storage result: {result}")
+                        task.add_done_callback(_mem0_done)
                     else:
                         logger.warning(f"Skipping memory storage: messages too short or empty")
                         
-                except ValueError as e:
-                    # Mem0 raises ValueError when facts already known (deduplication)
-                    if "empty" in str(e).lower():
-                        logger.debug("Mem0 skipped storage (duplicate/NOOP) - all facts already known")
-                    else:
-                        logger.error(f"Memory storage ValueError: {str(e)}")
-                except Exception as mem_error:
-                    logger.error(f"Memory storage failed for chat {payload.chatId}: {type(mem_error).__name__}: {str(mem_error)}")
+                except Exception:
+                    logger.exception("Failed to schedule Mem0 background write")
 
         except Exception as e:
             logger.exception("Chat streaming error")
