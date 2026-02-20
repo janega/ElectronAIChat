@@ -2,7 +2,6 @@
 from typing import Optional, Dict, Any, List
 import logging
 from .config import CHROMA_DIR, OPENAI_API_KEY, OLLAMA_HOST, DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OPENAI_LLM_MODEL, PROVIDER
-from fastapi.concurrency import run_in_threadpool
 
 logger = logging.getLogger("chat_backend.memory")
 
@@ -14,9 +13,9 @@ Focus on: user preferences, skills, workflows, projects, tools, and personal inf
 
 # Try to import mem0; if not available, provide a light fallback stub to avoid crash during dev/testing.
 try:
-    from mem0 import Memory
+    from mem0 import AsyncMemory
 except Exception:
-    Memory = None
+    AsyncMemory = None
     logger.warning("mem0 not available. Install mem0ai for production use or provide a compatible Memory class.")
 
 class MemoryStub:
@@ -25,7 +24,7 @@ class MemoryStub:
         self._store = {}
         self._counter = 0
 
-    def add(self, messages, user_id: str, metadata: Optional[dict] = None):
+    async def add(self, messages, user_id: str, metadata: Optional[dict] = None):
         entry_id = f"mem_{self._counter}"
         self._counter += 1
         self._store.setdefault(user_id, []).append({
@@ -35,7 +34,7 @@ class MemoryStub:
         })
         return entry_id
 
-    def search(self, query: str, user_id: str, limit: int = 5):
+    async def search(self, query: str, user_id: str, limit: int = 5):
         # very naive: return last `limit` messages
         all_for_user = self._store.get(user_id, [])
         results = []
@@ -43,10 +42,10 @@ class MemoryStub:
             results.append({"memory": " | ".join([m.get("content", "") for m in item.get("messages", [])]), "metadata": item.get("metadata", {})})
         return {"results": results}  # v1.1 format wrapper
 
-    def get_all(self, user_id: str):
+    async def get_all(self, user_id: str):
         return self._store.get(user_id, [])
 
-    def update(self, memory_id: str, data: Dict[str, Any]):
+    async def update(self, memory_id: str, data: Dict[str, Any]):
         # naive update: scan and update
         for uid, items in self._store.items():
             for item in items:
@@ -55,14 +54,14 @@ class MemoryStub:
                     return True
         return False
 
-    def delete(self, memory_id: str):
+    async def delete(self, memory_id: str):
         for uid, items in list(self._store.items()):
             new_items = [i for i in items if i.get("id") != memory_id]
             self._store[uid] = new_items
             return True
         return False
 
-    def add_conversation_pair(self, user_id: str, user_message: str, assistant_message: str, metadata: Optional[dict] = None):
+    async def add_conversation_pair(self, user_id: str, user_message: str, assistant_message: str, metadata: Optional[dict] = None):
         """MemoryStub implementation of add_conversation_pair for fallback consistency"""
         if not user_message or not user_message.strip() or len(user_message.strip()) < 3:
             return None
@@ -73,7 +72,7 @@ class MemoryStub:
             {"role": "user", "content": user_message},
             {"role": "assistant", "content": assistant_message}
         ]
-        return self.add(messages=conversation, user_id=user_id, metadata=metadata)
+        return await self.add(messages=conversation, user_id=user_id, metadata=metadata)
 
 class Mem0MemoryManager:
     def __init__(self):
@@ -209,14 +208,14 @@ class Mem0MemoryManager:
             self.memory = MemoryStub()
             return
 
-        if Memory is not None:
+        if AsyncMemory is not None:
             try:
                 # Debug: Log config structure before initialization
                 import json
                 logger.info(f"Initializing mem0 with config: {json.dumps({k: v if k != 'custom_instructions' else '...' for k, v in config.items()}, indent=2, default=str)}")
                 
-                self.memory = Memory.from_config(config)
-                logger.info(f"✅ mem0 Memory initialized successfully (using {PROVIDER} provider)")
+                self.memory = AsyncMemory.from_config(config)
+                logger.info(f"✅ mem0 AsyncMemory initialized successfully (using {PROVIDER} provider)")
             except TypeError as e:
                 # Config schema mismatch - mem0 may have different version requirements
                 logger.warning(
@@ -278,7 +277,7 @@ class Mem0MemoryManager:
         
         return True
 
-    def add_message(self, user_id: str, message: str, role: str = "user", metadata: Optional[Dict] = None):
+    async def add_message(self, user_id: str, message: str, role: str = "user", metadata: Optional[Dict] = None):
         # Apply semantic filter before storage
         if not self._should_persist(message):
             logger.debug(f"Semantic filter rejected message for user {user_id}")
@@ -292,8 +291,7 @@ class Mem0MemoryManager:
             enriched_metadata = metadata or {}
             enriched_metadata["content_type"] = "user_message"
             
-            # mem0 v1.0: async_mode=True by default, output_format="v1.1" by default
-            result = self.memory.add(
+            result = await self.memory.add(
                 messages=[{"role": role, "content": message}],
                 user_id=user_id,
                 metadata=enriched_metadata
@@ -320,7 +318,7 @@ class Mem0MemoryManager:
             # Silently continue - memory storage is not critical for chat functionality
             return None
 
-    def add_conversation_pair(self, user_id: str, user_message: str, assistant_message: str, metadata: Optional[Dict] = None):
+    async def add_conversation_pair(self, user_id: str, user_message: str, assistant_message: str, metadata: Optional[Dict] = None):
         """
         Store a complete user-assistant conversation pair in memory.
         Mem0 analyzes the full exchange for contextual fact extraction.
@@ -358,8 +356,7 @@ class Mem0MemoryManager:
                 {"role": "assistant", "content": assistant_message}
             ]
             
-            # mem0 v1.0: async_mode=True by default (non-blocking), output_format="v1.1" by default
-            result = self.memory.add(
+            result = await self.memory.add(
                 messages=conversation,
                 user_id=user_id,
                 metadata=enriched_metadata
@@ -388,10 +385,10 @@ class Mem0MemoryManager:
             logger.warning(f"Failed to add conversation pair: {type(e).__name__}: {str(e)}")
             return None
 
-    def search_memory(self, user_id: str, query: str, limit: int = 5):
+    async def search_memory(self, user_id: str, query: str, limit: int = 5):
         try:
             logger.debug(f"Searching memory for user={user_id}, query='{query[:100]}', limit={limit}")
-            result = self.memory.search(query=query, user_id=user_id, limit=limit)
+            result = await self.memory.search(query=query, user_id=user_id, limit=limit)
             
             # v1.1 format: result is {"results": [...]}
             if result and isinstance(result, dict) and 'results' in result:
@@ -403,29 +400,29 @@ class Mem0MemoryManager:
             logger.exception("Memory search failed")
             return {"results": []}  # Return v1.1 format on error
 
-    def get_all(self, user_id: str):
+    async def get_all(self, user_id: str):
         try:
-            return self.memory.get_all(user_id=user_id)
+            return await self.memory.get_all(user_id=user_id)
         except Exception:
             logger.exception("Failed to get all memories")
             return []
 
-    def update_memory(self, memory_id: str, data: Dict[str, Any]):
+    async def update_memory(self, memory_id: str, data: Dict[str, Any]):
         try:
-            return self.memory.update(memory_id=memory_id, data=data)
+            return await self.memory.update(memory_id=memory_id, data=data)
         except Exception:
             logger.exception("Failed to update memory")
             return False
 
-    def delete_memory(self, memory_id: str):
+    async def delete_memory(self, memory_id: str):
         try:
-            return self.memory.delete(memory_id=memory_id)
+            return await self.memory.delete(memory_id=memory_id)
         except Exception:
             logger.exception("Failed to delete memory")
             return False
 
-    def get_user_context(self, user_id: str) -> str:
-        memories = self.get_all(user_id)
+    async def get_user_context(self, user_id: str) -> str:
+        memories = await self.get_all(user_id)
         if not memories:
             return ""
         context_parts = []

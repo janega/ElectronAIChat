@@ -8,7 +8,6 @@ import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, Body, Depends
 from fastapi.responses import StreamingResponse
-from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import Optional
 from app.config import logger, DEFAULT_SETTINGS
@@ -166,9 +165,8 @@ async def chat_stream(
                 try:
                     logger.info(f"Querying Mem0 for user_id={payload.userId}")
                     
-                    # Mem0 v1.0 uses internal ThreadPoolExecutor which deadlocks when wrapped in run_in_threadpool
-                    # Call directly - Mem0 handles its own async execution
-                    relevant_memories = mem0_manager.search_memory(
+                    # Use native async API - no run_in_threadpool needed
+                    relevant_memories = await mem0_manager.search_memory(
                         user_id=payload.userId,
                         query=payload.message,
                         limit=5
@@ -275,13 +273,12 @@ async def chat_stream(
             # 6. Store conversation in memory for future context (mem0 v1.0 handles async internally)
             if payload.useMemory:
                 try:
-                    # Store conversation pair - Mem0 v1.0 with async_mode=True (default) handles non-blocking
+                    # Store conversation pair using native async API
                     if payload.message and payload.message.strip() and full_response and full_response.strip():
                         logger.debug(f"Storing conversation pair: user='{payload.message[:100]}', assistant='{full_response[:100]}'")
                         
-                        # mem0 v1.0 async_mode=True: Returns immediately, processes in background
-                        # No need for run_in_threadpool or asyncio.create_task wrappers
-                        result = mem0_manager.add_conversation_pair(
+                        # mem0 v1.0+ native async API - await directly
+                        result = await mem0_manager.add_conversation_pair(
                             user_message=payload.message,
                             assistant_message=full_response,
                             user_id=payload.userId,
