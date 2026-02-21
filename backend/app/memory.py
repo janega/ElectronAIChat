@@ -119,46 +119,36 @@ class Mem0MemoryManager:
         
         # Add provider-specific LLM configuration
         if PROVIDER == "llamacpp":
-            # LlamaCpp: Memory disabled to avoid circular dependency deadlock
+            # LlamaCpp: Mem0 uses the internal OpenAI-compatible endpoints already registered
+            # at /v1/completions and /v1/embeddings (app/routes/llamacpp_api.py).
             #
-            # PROBLEM: Mem0 needs to call OpenAI-compatible endpoints (/v1/embeddings, /v1/completions)
-            # When these endpoints run on the same FastAPI server (port 8000), Mem0 calls during
-            # chat streaming create a circular dependency - the server calls itself and deadlocks.
+            # No deadlock risk: memory storage is always scheduled as asyncio.create_task
+            # in chat.py AFTER the stream has fully completed and been sent to the client.
+            # The server is free to handle /v1/embeddings requests from Mem0 at that point.
             #
-            # SOLUTION: Run llama-cpp-python endpoints on a separate server (port 8001)
-            # This allows Mem0 to call http://127.0.0.1:8001/v1 without blocking the main server.
-            #
-            # IMPLEMENTATION:
-            # 1. Create llamacpp_server.py - standalone FastAPI app with OpenAI-compatible routes
-            # 2. Run on port 8001 (separate from main backend on port 8000)
-            # 3. Configure Mem0 to use "openai_base_url": "http://127.0.0.1:8001/v1"
-            # 4. Update Electron main.ts to spawn both processes
-            # 5. Update PyInstaller to build both backend.exe and llamacpp_api.exe
-            #
-            # TRADE-OFFS:
-            # + Full Mem0 functionality with llamacpp (persistent memory across sessions)
-            # + No circular dependency deadlock
-            # - ~3GB additional RAM usage (llama-cpp-python + loaded models)
-            # - 2-3s extra startup time
-            # - More complex deployment (two processes to manage)
-            #
-            # For now, using MemoryStub for simplicity and lower resource usage.
-            # TODO: Implement separate llamacpp API server for full Mem0 + llamacpp integration
-            
-            logger.info("LlamaCpp provider detected - using MemoryStub (Mem0 disabled to avoid deadlock)")
-            logger.info("To enable Mem0 with llamacpp, implement separate API server on port 8001")
-            self.memory = MemoryStub()
-            return
-            config["embedder"] = {
-                "provider": "openai",  # Use OpenAI provider with custom base_url
+            # No extra RAM: reuses the same llama-cpp-python model instances already loaded
+            # in main.py - no second process or model loading required.
+            internal_base_url = "http://127.0.0.1:8000/v1"
+            config["llm"] = {
+                "provider": "openai",  # OpenAI provider with custom base_url
                 "config": {
-                    "model": "llamacpp-embed",
+                    "model": "llamacpp",
                     "api_key": "dummy",  # Not used by our internal endpoints
-                    "openai_base_url": internal_base_url,  # Point to our llamacpp endpoints
+                    "openai_base_url": internal_base_url,
+                    "temperature": 0.1,
+                    "max_tokens": 150,  # Fact extraction is concise; lower = faster
+                    "stop": ["\n\n", "User:", "Assistant:"],
                 }
             }
-            
-            logger.info("✅ LlamaCpp configured for Mem0 via OpenAI-compatible endpoints")
+            config["embedder"] = {
+                "provider": "openai",
+                "config": {
+                    "model": "llamacpp-embed",
+                    "api_key": "dummy",
+                    "openai_base_url": internal_base_url,
+                }
+            }
+            logger.info("✅ LlamaCpp configured for Mem0 via internal OpenAI-compatible endpoints")
             logger.info(f"   Using internal API at {internal_base_url}")
         
         elif PROVIDER == "ollama":
@@ -188,10 +178,10 @@ class Mem0MemoryManager:
                 "config": {
                     "model": DEFAULT_OPENAI_LLM_MODEL,
                     "temperature": 0.1,  # Deterministic extraction
-                    "max_tokens": 250,  # Increased for complex fact extraction
+                    "max_tokens": 150,  # Increased for complex fact extraction
                     "api_key": OPENAI_API_KEY,
                     "top_p": 0.2,  # Very focused sampling for explicit facts only
-                    # Note: OpenAI doesn't support top_k parameter
+                    "stop": ["\n\n", "User:", "Assistant:"],
                 }
             }
             config["embedder"] = {
@@ -209,26 +199,33 @@ class Mem0MemoryManager:
             return
 
         if AsyncMemory is not None:
-            try:
-                # Debug: Log config structure before initialization
-                import json
-                logger.info(f"Initializing mem0 with config: {json.dumps({k: v if k != 'custom_instructions' else '...' for k, v in config.items()}, indent=2, default=str)}")
-                
-                self.memory = AsyncMemory.from_config(config)
-                logger.info(f"✅ mem0 AsyncMemory initialized successfully (using {PROVIDER} provider)")
-            except TypeError as e:
-                # Config schema mismatch - mem0 may have different version requirements
-                logger.warning(
-                    f"mem0 config schema error (likely version mismatch): {str(e)[:100]}"
-                )
-                logger.info("Falling back to in-memory MemoryStub")
-                self.memory = MemoryStub()
-            except Exception as e:
-                logger.exception(f"mem0 initialization failed: {type(e).__name__}")
-                logger.info("Falling back to in-memory MemoryStub")
-                self.memory = MemoryStub()
+            # AsyncMemory.from_config() is itself async - we can't await it here in __init__.
+            # Store the config and lazily initialize on the first async call instead.
+            import json
+            logger.info(f"mem0 config ready (lazy init): {json.dumps({k: v if k != 'custom_instructions' else '...' for k, v in config.items()}, indent=2, default=str)}")
+            self.memory = None          # Will be set on first await _ensure_initialized()
+            self._pending_config = config
         else:
             logger.info("mem0 package not available, using in-memory MemoryStub")
+            self.memory = MemoryStub()
+
+    async def _ensure_initialized(self):
+        """Lazily initialize AsyncMemory on first async call (from_config is itself async)."""
+        if self.memory is not None:
+            return
+        config = getattr(self, '_pending_config', None)
+        if config is None:
+            self.memory = MemoryStub()
+            return
+        try:
+            self.memory = await AsyncMemory.from_config(config)
+            del self._pending_config
+            logger.info(f"✅ mem0 AsyncMemory initialized successfully (using {PROVIDER} provider)")
+        except TypeError as e:
+            logger.warning(f"mem0 config schema error (likely version mismatch): {str(e)[:100]}")
+            self.memory = MemoryStub()
+        except Exception as e:
+            logger.exception(f"mem0 initialization failed: {type(e).__name__}")
             self.memory = MemoryStub()
 
     def _should_persist(self, message: str) -> bool:
@@ -278,6 +275,7 @@ class Mem0MemoryManager:
         return True
 
     async def add_message(self, user_id: str, message: str, role: str = "user", metadata: Optional[Dict] = None):
+        await self._ensure_initialized()
         # Apply semantic filter before storage
         if not self._should_persist(message):
             logger.debug(f"Semantic filter rejected message for user {user_id}")
@@ -332,6 +330,7 @@ class Mem0MemoryManager:
         Returns:
             mem0 result dict (v1.1 format: {"results": [...]}) or None if filtered/failed
         """
+        await self._ensure_initialized()
         # Apply semantic filter to user message
         if not self._should_persist(user_message):
             logger.debug(f"Semantic filter rejected conversation pair for user {user_id}")
@@ -386,6 +385,7 @@ class Mem0MemoryManager:
             return None
 
     async def search_memory(self, user_id: str, query: str, limit: int = 5):
+        await self._ensure_initialized()
         try:
             logger.debug(f"Searching memory for user={user_id}, query='{query[:100]}', limit={limit}")
             result = await self.memory.search(query=query, user_id=user_id, limit=limit)
@@ -401,6 +401,7 @@ class Mem0MemoryManager:
             return {"results": []}  # Return v1.1 format on error
 
     async def get_all(self, user_id: str):
+        await self._ensure_initialized()
         try:
             return await self.memory.get_all(user_id=user_id)
         except Exception:
@@ -408,6 +409,7 @@ class Mem0MemoryManager:
             return []
 
     async def update_memory(self, memory_id: str, data: Dict[str, Any]):
+        await self._ensure_initialized()
         try:
             return await self.memory.update(memory_id=memory_id, data=data)
         except Exception:
@@ -415,6 +417,7 @@ class Mem0MemoryManager:
             return False
 
     async def delete_memory(self, memory_id: str):
+        await self._ensure_initialized()
         try:
             return await self.memory.delete(memory_id=memory_id)
         except Exception:

@@ -163,9 +163,7 @@ async def chat_stream(
             memory_used = False
             if payload.useMemory:
                 try:
-                    logger.info(f"Querying Mem0 for user_id={payload.userId}")
-                    
-                    # Use native async API - no run_in_threadpool needed
+                    logger.info(f"Querying Mem0 for user_id={payload.userId}")                 
                     relevant_memories = await mem0_manager.search_memory(
                         user_id=payload.userId,
                         query=payload.message,

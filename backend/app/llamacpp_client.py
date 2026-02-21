@@ -184,34 +184,29 @@ class LlamaCppClient:
     
     def _format_messages_for_llamacpp(self, messages: List[Dict[str, str]]) -> str:
         """
-        Convert OpenAI-style messages to a single prompt string.
+        Convert OpenAI-style messages to a single prompt string using ChatML format.
         
-        LlamaCpp expects a single string prompt, not structured messages.
-        This formats messages in a way the model understands.
+        Qwen models are trained on ChatML tokens (<|im_start|> / <|im_end|>).
+        Using the correct format is critical - wrong format causes repetition loops
+        because the model never sees a familiar end-of-turn signal.
         
         Args:
             messages: List of dicts with 'role' and 'content' keys
             
         Returns:
-            Formatted prompt string
+            Formatted prompt string in ChatML format
         """
         prompt_parts = []
         
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
-            
-            if role == "system":
-                prompt_parts.append(f"System: {content}")
-            elif role == "user":
-                prompt_parts.append(f"User: {content}")
-            elif role == "assistant":
-                prompt_parts.append(f"Assistant: {content}")
+            prompt_parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
         
-        # Add final prompt for assistant response
-        prompt_parts.append("Assistant:")
+        # Add opening tag for assistant turn - model fills in the rest and closes with <|im_end|>
+        prompt_parts.append("<|im_start|>assistant\n")
         
-        return "\n\n".join(prompt_parts)
+        return "\n".join(prompt_parts)
     
     async def create_chat_completion(
         self,
@@ -263,9 +258,13 @@ class LlamaCppClient:
                         temperature=temperature,
                         top_p=top_p,
                         top_k=top_k,
-                        repeat_penalty=1.15,  # Penalize repetition (1.0 = no penalty, 1.3 = strong)
+                        repeat_penalty=1.3,   # Penalize repetition - small models (0.6B) need 1.3+ to avoid loops
                         stream=True,
-                        stop=["User:", "System:", "\n\nUser:", "\n\nSystem:", "---"],  # Stop at conversation turns and separators
+                        stop=[
+                            "<|im_end|>",        # Qwen/ChatML native end-of-turn token (primary)
+                            "<|endoftext|>",     # Qwen native EOS token
+                            "<|im_start|>",      # Prevent model generating next turn itself
+                        ],
                     )
                     
                     for chunk in response_stream:

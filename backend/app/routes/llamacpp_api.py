@@ -79,6 +79,12 @@ async def create_completion(request: CompletionRequest):
         # Get chat LLM
         llm = llamacpp_client.get_chat_llm()
         
+        # Use stop sequences from request, or fall back to sensible defaults.
+        # Without stop tokens, the model will fill all max_tokens with filler text
+        # (e.g. when Mem0 asks it to extract facts from a short message like "Hi").
+        DEFAULT_STOP = ["\n\n", "User:", "Assistant:", "<|im_end|>", "</s>", "<|eot_id|>"]
+        stop_sequences = request.stop if request.stop else DEFAULT_STOP
+
         # Generate completion
         response = llm(
             request.prompt,
@@ -86,7 +92,7 @@ async def create_completion(request: CompletionRequest):
             temperature=request.temperature,
             top_p=request.top_p,
             top_k=request.top_k,
-            stop=request.stop or [],
+            stop=stop_sequences,
             stream=False,
         )
         
