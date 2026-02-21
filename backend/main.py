@@ -156,6 +156,12 @@ async def lifespan(app: FastAPI):
         logger.info(f"Chat Model: {LLAMACPP_CHAT_MODEL}")
         logger.info(f"Embed Model: {LLAMACPP_EMBED_MODEL}")
         logger.info("=" * 80)
+        
+        # GPU Auto-Detection
+        from app.gpu_detector import auto_detect_and_configure
+        gpu_config = auto_detect_and_configure()
+        app.state.gpu_info = gpu_config  # Store for API endpoint
+        
         logger.info("Verifying LlamaCpp models...")
         
         chat_model_path = LLAMACPP_MODELS_DIR / LLAMACPP_CHAT_MODEL

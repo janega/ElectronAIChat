@@ -69,3 +69,41 @@ async def health_check(
             "provider": PROVIDER, 
             "components": {"error": str(e)}
         }
+
+
+@router.get("/capabilities")
+async def get_capabilities(request: Request):
+    """
+    Get system capabilities including GPU support for LlamaCpp.
+    
+    Returns:
+    - Available LLM providers
+    - GPU detection status
+    - CUDA availability for LlamaCpp
+    - Hardware recommendations
+    """
+    capabilities = {
+        "llm_providers": ["ollama", "openai", "llamacpp"],
+        "current_provider": PROVIDER,
+        "gpu_info": {
+            "available": False,
+            "cuda_enabled": False
+        }
+    }
+    
+    # Get GPU info from app state (set during startup if llamacpp provider)
+    gpu_config = getattr(request.app.state, 'gpu_info', None)
+    if gpu_config:
+        gpu_info = gpu_config.get("gpu_info", {})
+        cuda_available = gpu_config.get("cuda_available", False)
+        
+        capabilities["gpu_info"] = {
+            "available": gpu_info.get("available", False),
+            "name": gpu_info.get("name"),
+            "vram_mb": gpu_info.get("vram_mb"),
+            "compute_capability": gpu_info.get("compute_capability"),
+            "cuda_enabled": cuda_available,
+            "recommended": gpu_info.get("recommended", False)
+        }
+    
+    return capabilities

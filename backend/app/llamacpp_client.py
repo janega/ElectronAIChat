@@ -263,8 +263,9 @@ class LlamaCppClient:
                         temperature=temperature,
                         top_p=top_p,
                         top_k=top_k,
+                        repeat_penalty=1.15,  # Penalize repetition (1.0 = no penalty, 1.3 = strong)
                         stream=True,
-                        stop=["User:", "System:"],  # Stop generation at next turn
+                        stop=["User:", "System:", "\n\nUser:", "\n\nSystem:", "---"],  # Stop at conversation turns and separators
                     )
                     
                     for chunk in response_stream:
