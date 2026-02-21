@@ -6,7 +6,11 @@ from logging.handlers import RotatingFileHandler
 import sys
 
 # Provider configuration
-PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+# Note: This is the initial env-based setting. Runtime detection happens in main.py
+# using detect_available_provider() which checks Ollama → llamacpp → OpenAI
+# Set LLM_PROVIDER to override auto-detection: "ollama", "llamacpp", "openai", or "auto"
+PROVIDER_ENV = os.getenv("LLM_PROVIDER", "auto").lower()
+PROVIDER = PROVIDER_ENV  # Will be updated by main.py after runtime detection
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
@@ -155,8 +159,32 @@ DEFAULT_OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "gpt-3.5-turbo")
 # OCR Configuration (Poppler path for pdf2image)
 POPPLER_PATH = os.getenv("POPPLER_PATH", r"D:\My Coding Projects\Poppler\poppler-25.07.0\Library\bin")
 
+# =============================================================================
+# LLAMACPP PROVIDER CONFIGURATION
+# =============================================================================
+
+# Model directory and files
+LLAMACPP_MODELS_DIR = Path(os.getenv("LLAMACPP_MODELS_DIR", "./models"))
+LLAMACPP_CHAT_MODEL = os.getenv("LLAMACPP_CHAT_MODEL", "qwen3-0.6b-q4.gguf")
+LLAMACPP_EMBED_MODEL = os.getenv("LLAMACPP_EMBED_MODEL", "nomic-embed-text-q4.gguf")
+
+# Performance settings
+LLAMACPP_ENABLE_PARALLEL = os.getenv("LLAMACPP_ENABLE_PARALLEL", "false").lower() == "true"
+LLAMACPP_N_CTX = int(os.getenv("LLAMACPP_N_CTX", "2048"))
+LLAMACPP_VERBOSE = os.getenv("LLAMACPP_VERBOSE", "false").lower() == "true"
+
+# GPU settings (None = auto-detect)
+_n_gpu_layers_env = os.getenv("LLAMACPP_N_GPU_LAYERS")
+LLAMACPP_N_GPU_LAYERS = int(_n_gpu_layers_env) if _n_gpu_layers_env else None
+
+# Ensure models directory exists
+LLAMACPP_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+logger.info(f"LlamaCpp config: provider={PROVIDER}, models_dir={LLAMACPP_MODELS_DIR}")
+
 # Default settings for new users and fallback when UserSettings missing
 DEFAULT_SETTINGS = {
+    "provider": "auto",  # auto, ollama, llamacpp, openai
     "temperature": 0.7,
     "max_tokens": 2048,
     "top_p": 0.9,

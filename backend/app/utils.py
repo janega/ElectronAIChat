@@ -17,11 +17,122 @@ import httpx
 import asyncio
 import subprocess
 import time
+import os
 from datetime import datetime
 
 from app.config import POPPLER_PATH, OLLAMA_HOST
 
 logger = logging.getLogger("chat_backend.utils")
+
+
+async def detect_available_provider(preferred_provider: Optional[str] = None) -> dict:
+    """
+    Detect the best available LLM provider with runtime fallback.
+    
+    Priority:
+    1. Use preferred_provider if specified and available (user override)
+    2. Check for Ollama availability (will attempt to start if installed)
+    3. Fallback to llamacpp (bundled default)
+    4. Fallback to OpenAI if API key present
+    
+    Args:
+        preferred_provider: User-specified provider override ("ollama", "llamacpp", "openai", or None)
+        
+    Returns:
+        Dict with:
+        - provider: The selected provider name
+        - available: Whether the provider is confirmed available
+        - reason: Explanation for the selection
+        - ollama_checked: Whether Ollama was checked (for logging)
+        - models: List of available models (if applicable)
+        - started_by_us: Whether we started Ollama (if applicable)
+        - process: Ollama process reference (if started by us)
+    """
+    result = {
+        "provider": "llamacpp",  # Default fallback
+        "available": False,
+        "reason": "Default fallback",
+        "ollama_checked": False,
+        "models": [],
+        "started_by_us": False,
+        "process": None
+    }
+    
+    # If user explicitly requested OpenAI, use it (requires API key validation later)
+    if preferred_provider == "openai":
+        from app.config import OPENAI_API_KEY
+        if OPENAI_API_KEY and OPENAI_API_KEY != "":
+            result["provider"] = "openai"
+            result["available"] = True
+            result["reason"] = "User-specified OpenAI with valid API key"
+            logger.info(f"✅ {result['reason']}")
+            return result
+        else:
+            logger.warning("⚠️ OpenAI requested but no API key found, checking alternatives...")
+    
+    # If user explicitly requested llamacpp, verify models exist
+    if preferred_provider == "llamacpp":
+        from app.config import LLAMACPP_MODELS_DIR, LLAMACPP_CHAT_MODEL
+        chat_model_path = LLAMACPP_MODELS_DIR / LLAMACPP_CHAT_MODEL
+        
+        if chat_model_path.exists():
+            result["provider"] = "llamacpp"
+            result["available"] = True
+            result["reason"] = "User-specified llamacpp with valid model"
+            logger.info(f"✅ {result['reason']}: {chat_model_path}")
+            return result
+        else:
+            logger.warning(f"⚠️ LlamaCpp requested but model not found: {chat_model_path}")
+            logger.warning("   Checking alternatives...")
+    
+    # Check Ollama availability (unless user explicitly chose llamacpp without ollama fallback)
+    if preferred_provider != "llamacpp":
+        logger.info("🔍 Checking Ollama availability...")
+        result["ollama_checked"] = True
+        
+        # Try to ensure Ollama is running (will start if needed)
+        ollama_status = await ensure_ollama_running(OLLAMA_HOST)
+        
+        if ollama_status["running"] and len(ollama_status.get("models", [])) > 0:
+            result["provider"] = "ollama"
+            result["available"] = True
+            result["models"] = ollama_status.get("models", [])
+            result["started_by_us"] = ollama_status.get("started_by_us", False)
+            result["process"] = ollama_status.get("process")
+            result["reason"] = f"Ollama {'started' if result['started_by_us'] else 'detected'} with {len(result['models'])} models"
+            logger.info(f"✅ {result['reason']}")
+            return result
+        else:
+            logger.info("ℹ️ Ollama not available, falling back to llamacpp")
+    
+    # Fallback to llamacpp (bundled default)
+    from app.config import LLAMACPP_MODELS_DIR, LLAMACPP_CHAT_MODEL, LLAMACPP_EMBED_MODEL
+    
+    chat_model_path = LLAMACPP_MODELS_DIR / LLAMACPP_CHAT_MODEL
+    embed_model_path = LLAMACPP_MODELS_DIR / LLAMACPP_EMBED_MODEL
+    
+    if chat_model_path.exists() and embed_model_path.exists():
+        result["provider"] = "llamacpp"
+        result["available"] = True
+        result["reason"] = "Bundled llamacpp models found"
+        result["models"] = [LLAMACPP_CHAT_MODEL, LLAMACPP_EMBED_MODEL]
+        logger.info(f"✅ {result['reason']}: {chat_model_path.name}, {embed_model_path.name}")
+    elif chat_model_path.exists():
+        result["provider"] = "llamacpp"
+        result["available"] = True
+        result["reason"] = "Llamacpp chat model found (missing embeddings)"
+        result["models"] = [LLAMACPP_CHAT_MODEL]
+        logger.warning(f"⚠️ {result['reason']}")
+        logger.warning(f"   Expected embed model: {embed_model_path}")
+    else:
+        result["provider"] = "llamacpp"
+        result["available"] = False
+        result["reason"] = "No providers available - llamacpp models missing"
+        logger.error(f"❌ {result['reason']}")
+        logger.error(f"   Expected models in: {LLAMACPP_MODELS_DIR}")
+        logger.error(f"   Run: python scripts/download_models.py")
+    
+    return result
 
 
 async def check_ollama_health(base_url: str = OLLAMA_HOST, timeout: float = 5.0) -> dict:
