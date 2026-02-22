@@ -1,6 +1,7 @@
 import React from 'react';
-import { Upload, Maximize2, Minimize2, CheckCircle, XCircle, Loader, Brain } from 'lucide-react';
+import { Upload, Maximize2, Minimize2, CheckCircle, XCircle, Loader, Brain, AlertTriangle } from 'lucide-react';
 import { DocumentWithStatus } from '../types';
+import type { ModelInfo } from '../utils/api';
 
 interface ChatControlsProps {
   uploadedDocs: DocumentWithStatus[];
@@ -12,6 +13,7 @@ interface ChatControlsProps {
   isLoading: boolean;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  modelInfo?: ModelInfo | null;
 }
 
 export function ChatControls({
@@ -24,7 +26,14 @@ export function ChatControls({
   isLoading,
   isExpanded,
   onToggleExpand,
+  modelInfo,
 }: ChatControlsProps) {
+  const isSmallModel =
+    modelInfo != null &&
+    modelInfo.estimated_params_billions > 0 &&
+    modelInfo.estimated_params_billions <= 1.5;
+
+  const showWarning = isSmallModel && useMemory;
   return (
     <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-4 flex items-center gap-3">
       <label className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer transition"
@@ -77,15 +86,36 @@ export function ChatControls({
 
       <button
         onClick={() => onUseMemoryChange(!useMemory)}
-        className={`p-2 rounded-lg transition flex items-center gap-1.5 ${
+        className={`relative p-2 rounded-lg transition flex items-center gap-1.5 group ${
           useMemory
-            ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+            ? isSmallModel
+              ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300'
+              : 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
             : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
         }`}
-        title={useMemory ? 'Memory enabled - AI will remember context' : 'Memory disabled'}
+        title={
+          useMemory
+            ? isSmallModel
+              ? `Memory ON — ⚠️ ${modelInfo?.name} is a small model. May cause hallucinations.`
+              : 'Memory enabled - AI will remember context'
+            : 'Memory disabled'
+        }
       >
         <Brain size={18} />
+        {showWarning && <AlertTriangle size={12} className="text-yellow-600 dark:text-yellow-400" />}
         <span className="text-xs font-medium">{useMemory ? 'ON' : 'OFF'}</span>
+
+        {/* Tooltip warning - only shown when hovering small model + memory on */}
+        {showWarning && (
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 bg-yellow-50 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-600 text-yellow-800 dark:text-yellow-100 text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-left">
+            <p className="font-semibold mb-1">⚠️ Small Model Warning</p>
+            <p>
+              <strong>{modelInfo?.name}</strong> (~{modelInfo?.estimated_params_billions}B params)
+              is below the recommended 1.5B for memory. Fact extraction may cause hallucinations or
+              poor responses.
+            </p>
+          </div>
+        )}
       </button>
 
       <select

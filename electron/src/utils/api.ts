@@ -1,6 +1,14 @@
 import { Document, StreamChunk } from '../types';
 import { API_BASE_URL } from './constants';
 
+export interface ModelInfo {
+  name: string;
+  provider: string;
+  estimated_params_billions: number;
+  is_large_enough_for_memory: boolean;
+  memory_recommendation: 'enabled' | 'disabled';
+}
+
 export class ApiClient {
   private baseUrl: string;
 
@@ -200,6 +208,17 @@ export class ApiClient {
     }
 
     return response.json();
+  }
+
+  async getCapabilities(): Promise<{ model_info?: ModelInfo } | null> {
+    try {
+      const url = `${this.baseUrl}/api/capabilities`;
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) return null;
+      return response.json();
+    } catch {
+      return null;
+    }
   }
 
   async getUserChats(userId: string): Promise<any[]> {

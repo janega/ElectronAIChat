@@ -3,6 +3,7 @@ import { Menu, X, Settings, Plus, Sun, Moon, Wifi, WifiOff, Loader2 } from 'luci
 import { PageType, DocumentWithStatus, Message } from './types';
 import { useTheme, useSettings, useChatHistory, useChat } from './hooks';
 import { apiClient } from './utils/api';
+import type { ModelInfo } from './utils/api';
 import { SyncProvider, useSyncContext } from './contexts/SyncContext';
 import './styles/globals.css';
 import './styles/utils.css'; 
@@ -52,6 +53,7 @@ function AppContent() {
   const [uploadedDocs, setUploadedDocs] = useState<DocumentWithStatus[]>([]);
   const [searchMode, setSearchMode] = useState('normal');
   const [useMemory, setUseMemory] = useState(true);
+  const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [backendConnected, setBackendConnected] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
@@ -145,8 +147,22 @@ function AppContent() {
     try {
       await apiClient.checkStatus();
       setBackendConnected(true);
-      
-      // Also check health for startup warnings
+
+      // Fetch model capabilities to set memory default (only first time)
+      try {
+        const caps = await apiClient.getCapabilities();
+        if (caps?.model_info) {
+          setModelInfo((prev) => {
+            if (prev === null) {
+              // First load only - set memory default based on model size
+              setUseMemory(caps.model_info!.is_large_enough_for_memory);
+            }
+            return caps.model_info!;
+          });
+        }
+      } catch (capError) {
+        console.warn('Could not fetch model capabilities:', capError);
+      }
       try {
         const health = await apiClient.getHealth();
         const startupValidation = health?.components?.startup_validation;
@@ -657,6 +673,7 @@ function AppContent() {
                 isLoading={isLoading}
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded(!isInputExpanded)}
+                modelInfo={modelInfo}
               />
 
               <MessageInput

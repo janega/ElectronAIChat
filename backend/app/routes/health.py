@@ -3,13 +3,53 @@
 Health check and system status endpoints.
 Provides monitoring and diagnostics for system components.
 """
+import re
 from fastapi import APIRouter, Request
-from app.config import PROVIDER, DATABASE_PATH, logger
+from app.config import PROVIDER, DATABASE_PATH, logger, LLAMACPP_CHAT_MODEL, DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OPENAI_LLM_MODEL
 from app.schemas import HealthResponse
 from .dependencies import LangChainManager, DBSession
 from app.db_manager import get_db_stats
 
 router = APIRouter(prefix="/api", tags=["health"])
+
+MIN_PARAMS_FOR_MEMORY = 1.5  # Billion
+
+def estimate_model_params_billions(model_name: str) -> float:
+    """
+    Estimate model parameter count in billions from the model filename/name.
+    Returns 0.0 if unknown (caller treats 0.0 as 'unknown, allow memory').
+    """
+    name = model_name.lower()
+
+    # Parse common size patterns: 0.5b, 0.6b, 1.5b, 3b, 7b, 13b, 70b, 72b, 1.5B
+    # Also handles: qwen2.5-1.5b-q4, llama-3-8b-instruct.gguf, etc.
+    match = re.search(r'[-_](\d+\.?\d*)b(?:[qiQ_\-.]|$)', name)
+    if match:
+        return float(match.group(1))
+
+    # Fallback: bare number followed by 'b' anywhere
+    match = re.search(r'(\d+\.?\d*)b(?:[^a-z]|$)', name)
+    if match:
+        return float(match.group(1))
+
+    # Millions: 500m → 0.5
+    match = re.search(r'(\d+)m(?:[^a-z]|$)', name)
+    if match:
+        return float(match.group(1)) / 1000.0
+
+    # Known model families
+    known = {
+        "tinyllama": 1.1, "phi-2": 2.7, "phi2": 2.7,
+        "phi-3-mini": 3.8, "phi3:mini": 3.8,
+        "llama2": 7.0, "llama3": 8.0, "mistral": 7.0,
+        "gemma:2b": 2.0, "gemma2:2b": 2.0, "gemma:7b": 7.0,
+        "gpt-3.5": 20.0, "gpt-4": 1000.0,
+    }
+    for key, size in known.items():
+        if key in name:
+            return size
+
+    return 0.0  # Unknown
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -96,7 +136,7 @@ async def get_capabilities(request: Request):
     if gpu_config:
         gpu_info = gpu_config.get("gpu_info", {})
         cuda_available = gpu_config.get("cuda_available", False)
-        
+
         capabilities["gpu_info"] = {
             "available": gpu_info.get("available", False),
             "name": gpu_info.get("name"),
@@ -105,5 +145,24 @@ async def get_capabilities(request: Request):
             "cuda_enabled": cuda_available,
             "recommended": gpu_info.get("recommended", False)
         }
-    
+
+    # Model info - used by frontend to set memory default
+    if PROVIDER == "llamacpp":
+        current_model = LLAMACPP_CHAT_MODEL
+    elif PROVIDER == "ollama":
+        current_model = DEFAULT_OLLAMA_LLM_MODEL
+    else:
+        current_model = DEFAULT_OPENAI_LLM_MODEL
+
+    params_b = estimate_model_params_billions(current_model)
+    is_large_enough = params_b == 0.0 or params_b > MIN_PARAMS_FOR_MEMORY
+
+    capabilities["model_info"] = {
+        "name": current_model,
+        "provider": PROVIDER,
+        "estimated_params_billions": params_b,
+        "is_large_enough_for_memory": is_large_enough,
+        "memory_recommendation": "enabled" if is_large_enough else "disabled",
+    }
+
     return capabilities
