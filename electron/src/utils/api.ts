@@ -9,6 +9,12 @@ export interface ModelInfo {
   memory_recommendation: 'enabled' | 'disabled';
 }
 
+export interface ModelsResponse {
+  provider: string;
+  current_model: string;
+  models: string[];
+}
+
 export class ApiClient {
   private baseUrl: string;
 
@@ -219,6 +225,28 @@ export class ApiClient {
     } catch {
       return null;
     }
+  }
+
+  async getModels(): Promise<ModelsResponse | null> {
+    try {
+      const url = `${this.baseUrl}/api/models`;
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) return null;
+      return response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  async switchModel(
+    provider: string,
+    model: string,
+    userId?: string,
+  ): Promise<{ success: boolean; provider: string; model: string; changed: boolean }> {
+    return this.request('/api/models/switch', {
+      method: 'POST',
+      body: JSON.stringify({ provider, model, user_id: userId ?? null }),
+    });
   }
 
   async getUserChats(userId: string): Promise<any[]> {

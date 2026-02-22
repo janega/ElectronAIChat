@@ -130,6 +130,23 @@ def get_llamacpp_client():
     return _llamacpp_client
 
 
+def set_llamacpp_client(new_client):
+    """
+    Replace the LlamaCpp client singleton used for chat completions.
+
+    Called by POST /api/models/switch after the new GGUF model has been
+    instantiated.  The embedding manager is reset to None so it is
+    lazily recreated against the new client on the next embedding request.
+    The embedding model file itself is unchanged, so existing ChromaDB
+    collections remain valid.
+    """
+    global _llamacpp_client, _llamacpp_embedding_manager
+    _llamacpp_client = new_client
+    # Reset so get_llamacpp_embedding_manager() rebuilds with the new client
+    _llamacpp_embedding_manager = None
+    logger.info("LlamaCpp client singleton replaced")
+
+
 def get_llamacpp_embedding_manager():
     """Get or create LlamaCpp embedding manager singleton."""
     global _llamacpp_embedding_manager

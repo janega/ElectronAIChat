@@ -3,14 +3,15 @@ import { Menu, X, Settings, Plus, Sun, Moon, Wifi, WifiOff, Loader2 } from 'luci
 import { PageType, DocumentWithStatus, Message } from './types';
 import { useTheme, useSettings, useChatHistory, useChat } from './hooks';
 import { apiClient } from './utils/api';
-import type { ModelInfo } from './utils/api';
+import type { ModelInfo, ModelsResponse } from './utils/api';
 import { SyncProvider, useSyncContext } from './contexts/SyncContext';
 import './styles/globals.css';
 import './styles/utils.css'; 
 import { 
   ChatWindow, 
-  MessageInput, 
-  ChatControls, 
+  MessageInput,
+  ChatControls,
+  ModelBar,
   Sidebar, 
   SettingsPage,
   UsernameModal
@@ -54,7 +55,13 @@ function AppContent() {
   const [searchMode, setSearchMode] = useState('normal');
   const [useMemory, setUseMemory] = useState(true);
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
+  const [modelsData, setModelsData] = useState<ModelsResponse | null>(null);
+  const [isSwitching, setIsSwitching] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
+
+  // Track whether we have already attempted to restore the saved model for
+  // the current session (so we only do it once per login, not on every poll).
+  const modelRestoreAttempted = useRef(false);
   const [backendConnected, setBackendConnected] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -150,7 +157,10 @@ function AppContent() {
 
       // Fetch model capabilities to set memory default (only first time)
       try {
-        const caps = await apiClient.getCapabilities();
+        const [caps, models] = await Promise.all([
+          apiClient.getCapabilities(),
+          apiClient.getModels(),
+        ]);
         if (caps?.model_info) {
           setModelInfo((prev) => {
             if (prev === null) {
@@ -159,6 +169,9 @@ function AppContent() {
             }
             return caps.model_info!;
           });
+        }
+        if (models) {
+          setModelsData(models);
         }
       } catch (capError) {
         console.warn('Could not fetch model capabilities:', capError);
@@ -190,6 +203,53 @@ function AppContent() {
 
     return () => clearInterval(interval);
   }, []);
+
+  /**
+   * Switch the active LlamaCpp model.
+   * Called by ModelBar when the user picks a different model from the dropdown.
+   * Also called automatically (once per session) to restore the saved model from
+   * UserSettings when the frontend first connects to the backend.
+   */
+  const handleModelSwitch = useCallback(async (model: string) => {
+    if (isSwitching) return;
+    setIsSwitching(true);
+    try {
+      await apiClient.switchModel('llamacpp', model, userId ?? undefined);
+      // Refresh modelsData + capabilities so the UI reflects the new active model
+      const [newModels, newCaps] = await Promise.all([
+        apiClient.getModels(),
+        apiClient.getCapabilities(),
+      ]);
+      if (newModels) setModelsData(newModels);
+      if (newCaps?.model_info) setModelInfo(newCaps.model_info);
+    } catch (err) {
+      console.error('[ModelSwitch] Failed to switch model:', err);
+    } finally {
+      setIsSwitching(false);
+    }
+  }, [isSwitching, userId]);
+
+  // Auto-restore the model that was saved in UserSettings.
+  // Runs once after modelsData first loads and userId is known.
+  useEffect(() => {
+    if (modelRestoreAttempted.current) return;
+    if (!modelsData || !userId) return;
+    if (modelsData.provider !== 'llamacpp') return;
+
+    const savedModel = settings.model; // loaded from UserSettings.default_model
+    if (
+      savedModel &&
+      savedModel !== modelsData.current_model &&
+      modelsData.models.includes(savedModel)
+    ) {
+      console.log(`[ModelRestore] Restoring saved model: ${savedModel} (current: ${modelsData.current_model})`);
+      modelRestoreAttempted.current = true;
+      handleModelSwitch(savedModel);
+    } else {
+      // Nothing to restore — mark as done so we never retry
+      modelRestoreAttempted.current = true;
+    }
+  }, [modelsData, userId]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync visible messages from chat history - THIS IS THE SINGLE SOURCE OF TRUTH
   // Runs whenever chats array updates OR currentChatId changes
@@ -681,6 +741,12 @@ function AppContent() {
                 onStop={handleStopStream}
                 isLoading={isLoading}
                 isExpanded={isInputExpanded}
+              />
+
+              <ModelBar
+                modelsData={modelsData}
+                onModelSwitch={handleModelSwitch}
+                isSwitching={isSwitching}
               />
             </>
           ) : (

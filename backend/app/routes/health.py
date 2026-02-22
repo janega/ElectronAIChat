@@ -4,8 +4,9 @@ Health check and system status endpoints.
 Provides monitoring and diagnostics for system components.
 """
 import re
+import httpx
 from fastapi import APIRouter, Request
-from app.config import PROVIDER, DATABASE_PATH, logger, LLAMACPP_CHAT_MODEL, DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OPENAI_LLM_MODEL
+from app.config import PROVIDER, DATABASE_PATH, logger, LLAMACPP_MODELS_DIR, DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OPENAI_LLM_MODEL, OLLAMA_HOST, runtime_config
 from app.schemas import HealthResponse
 from .dependencies import LangChainManager, DBSession
 from app.db_manager import get_db_stats
@@ -148,7 +149,7 @@ async def get_capabilities(request: Request):
 
     # Model info - used by frontend to set memory default
     if PROVIDER == "llamacpp":
-        current_model = LLAMACPP_CHAT_MODEL
+        current_model = runtime_config.llamacpp_chat_model
     elif PROVIDER == "ollama":
         current_model = DEFAULT_OLLAMA_LLM_MODEL
     else:
@@ -166,3 +167,52 @@ async def get_capabilities(request: Request):
     }
 
     return capabilities
+
+
+@router.get("/models")
+async def get_available_models():
+    """
+    Return list of available models for the current provider.
+    - LlamaCpp: scans LLAMACPP_MODELS_DIR for .gguf files
+    - Ollama:   queries Ollama /api/tags
+    - OpenAI:   returns hardcoded common models
+    """
+    if PROVIDER == "llamacpp":
+        try:
+            gguf_files = sorted(LLAMACPP_MODELS_DIR.glob("*.gguf"))
+            models = [f.name for f in gguf_files]
+        except Exception as e:
+            logger.warning(f"Failed to scan models dir: {e}")
+            models = []
+        return {
+            "provider": PROVIDER,
+            "current_model": runtime_config.llamacpp_chat_model,
+            "models": models,
+        }
+
+    elif PROVIDER == "ollama":
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{OLLAMA_HOST}/api/tags")
+                resp.raise_for_status()
+                data = resp.json()
+                models = [m["name"] for m in data.get("models", [])]
+        except Exception as e:
+            logger.warning(f"Failed to fetch Ollama models: {e}")
+            models = [DEFAULT_OLLAMA_LLM_MODEL]
+        return {
+            "provider": PROVIDER,
+            "current_model": DEFAULT_OLLAMA_LLM_MODEL,
+            "models": models,
+        }
+
+    else:  # openai
+        models = [
+            "gpt-4o",
+            "gpt-4o-mini",
+        ]
+        return {
+            "provider": PROVIDER,
+            "current_model": DEFAULT_OPENAI_LLM_MODEL,
+            "models": models,
+        }

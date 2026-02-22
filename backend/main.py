@@ -1,15 +1,3 @@
-# backend.py
-"""
-ElectronAIChat Backend - FastAPI server with RAG, ChromaDB, and Memory
-
-Enhanced from original with:
-- SQLite database for persistent storage
-- ChromaDB vector storage (replacing Redis)
-- Mem0 memory system for long-term context
-- LangChain integration for embeddings and chat
-- OCR support for PDF processing
-- JSON file processing
-"""
 import os
 import subprocess
 from contextlib import asynccontextmanager
@@ -44,6 +32,7 @@ from app.routes.chats import router as chats_router
 from app.routes.users import router as users_router
 from app.routes.admin import router as admin_router
 from app.routes.llamacpp_api import router as llamacpp_api_router
+from app.routes.models import router as models_router
 
 # Use the logger from config
 logger = cfg_logger
@@ -334,6 +323,7 @@ app.include_router(documents_router)
 app.include_router(chats_router)
 app.include_router(users_router)
 app.include_router(admin_router)
+app.include_router(models_router)
 
 # Register internal llamacpp API (for Mem0 custom provider)
 app.include_router(llamacpp_api_router)

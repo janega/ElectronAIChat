@@ -155,7 +155,25 @@ class LlamaCppClient:
             Initialized Llama instance for chat completions
         """
         return self._get_chat_llm()
-    
+
+    def unload(self):
+        """
+        Release the chat model from memory before loading a new one.
+
+        Only the chat model is unloaded.  The embedding model is intentionally
+        left intact so that existing ChromaDB collections remain valid
+        (swapping embedding models would invalidate stored vectors).
+        """
+        import gc
+        if self._chat_llm is not None:
+            logger.info(f"Unloading chat model: {self.chat_model_path.name}")
+            del self._chat_llm
+            self._chat_llm = None
+            gc.collect()
+            logger.info("Chat model unloaded from memory")
+        else:
+            logger.debug("unload() called but no chat model was loaded")
+
     def _get_embedding_llm(self) -> Llama:
         """
         Lazy-load embedding model on first use.

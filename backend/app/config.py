@@ -180,6 +180,21 @@ LLAMACPP_N_GPU_LAYERS = int(_n_gpu_layers_env) if _n_gpu_layers_env else None
 # Ensure models directory exists
 LLAMACPP_MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
+# =============================================================================
+# RUNTIME CONFIG (mutable at runtime for hot-swapping models without restart)
+# =============================================================================
+
+class RuntimeConfig:
+    """
+    Mutable runtime state. Module-level constants above are immutable after import;
+    this singleton holds values that can change while the server is running
+    (e.g. when the user switches the active LlamaCpp model via the API).
+    """
+    def __init__(self):
+        self.llamacpp_chat_model: str = LLAMACPP_CHAT_MODEL
+
+runtime_config = RuntimeConfig()
+
 logger.info(f"LlamaCpp config: provider={PROVIDER}, models_dir={LLAMACPP_MODELS_DIR}")
 
 # Default settings for new users and fallback when UserSettings missing
