@@ -240,12 +240,19 @@ export class ApiClient {
 
   async switchModel(
     provider: string,
-    model: string,
+    model: string | undefined,
     userId?: string,
-  ): Promise<{ success: boolean; provider: string; model: string; changed: boolean }> {
+  ): Promise<{
+    success: boolean;
+    provider: string;
+    model: string | null;
+    models: string[];
+    changed: boolean;
+    warning: string | null;
+  }> {
     return this.request('/api/models/switch', {
       method: 'POST',
-      body: JSON.stringify({ provider, model, user_id: userId ?? null }),
+      body: JSON.stringify({ provider, model: model ?? null, user_id: userId ?? null }),
     });
   }
 

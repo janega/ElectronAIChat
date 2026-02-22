@@ -125,7 +125,7 @@ async def get_capabilities(request: Request):
     """
     capabilities = {
         "llm_providers": ["ollama", "openai", "llamacpp"],
-        "current_provider": PROVIDER,
+        "current_provider": runtime_config.provider,
         "gpu_info": {
             "available": False,
             "cuda_enabled": False
@@ -160,7 +160,7 @@ async def get_capabilities(request: Request):
 
     capabilities["model_info"] = {
         "name": current_model,
-        "provider": PROVIDER,
+        "provider": runtime_config.provider,
         "estimated_params_billions": params_b,
         "is_large_enough_for_memory": is_large_enough,
         "memory_recommendation": "enabled" if is_large_enough else "disabled",
@@ -177,7 +177,9 @@ async def get_available_models():
     - Ollama:   queries Ollama /api/tags
     - OpenAI:   returns hardcoded common models
     """
-    if PROVIDER == "llamacpp":
+    # Use runtime_config.provider so this reflects mid-session provider switches
+    provider = runtime_config.provider
+    if provider == "llamacpp":
         try:
             gguf_files = sorted(LLAMACPP_MODELS_DIR.glob("*.gguf"))
             models = [f.name for f in gguf_files]
@@ -185,12 +187,12 @@ async def get_available_models():
             logger.warning(f"Failed to scan models dir: {e}")
             models = []
         return {
-            "provider": PROVIDER,
+            "provider": provider,
             "current_model": runtime_config.llamacpp_chat_model,
             "models": models,
         }
 
-    elif PROVIDER == "ollama":
+    elif provider == "ollama":
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{OLLAMA_HOST}/api/tags")
@@ -201,8 +203,8 @@ async def get_available_models():
             logger.warning(f"Failed to fetch Ollama models: {e}")
             models = [DEFAULT_OLLAMA_LLM_MODEL]
         return {
-            "provider": PROVIDER,
-            "current_model": DEFAULT_OLLAMA_LLM_MODEL,
+            "provider": provider,
+            "current_model": runtime_config.ollama_model,
             "models": models,
         }
 
@@ -212,7 +214,7 @@ async def get_available_models():
             "gpt-4o-mini",
         ]
         return {
-            "provider": PROVIDER,
+            "provider": provider,
             "current_model": DEFAULT_OPENAI_LLM_MODEL,
             "models": models,
         }

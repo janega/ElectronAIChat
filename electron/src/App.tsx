@@ -57,6 +57,7 @@ function AppContent() {
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
   const [modelsData, setModelsData] = useState<ModelsResponse | null>(null);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [switchWarning, setSwitchWarning] = useState<string | null>(null);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
 
   // Track whether we have already attempted to restore the saved model for
@@ -210,19 +211,31 @@ function AppContent() {
    * Also called automatically (once per session) to restore the saved model from
    * UserSettings when the frontend first connects to the backend.
    */
-  const handleModelSwitch = useCallback(async (model: string) => {
+  const handleModelSwitch = useCallback(async (provider: string, model?: string) => {
     if (isSwitching) return;
     setIsSwitching(true);
+    setSwitchWarning(null);
     try {
-      await apiClient.switchModel('llamacpp', model, userId ?? undefined);
-      // Refresh modelsData + capabilities so the UI reflects the new active model
-      const [newModels, newCaps] = await Promise.all([
-        apiClient.getModels(),
-        apiClient.getCapabilities(),
-      ]);
-      if (newModels) setModelsData(newModels);
-      if (newCaps?.model_info) setModelInfo(newCaps.model_info);
+      const result = await apiClient.switchModel(provider, model, userId ?? undefined);
+      if (!result.success) {
+        setSwitchWarning(result.warning ?? 'Switch failed — check the backend logs.');
+        // Still update the displayed model list so the UI shows "no models"
+        setModelsData(prev => prev
+          ? { ...prev, provider: result.provider, models: result.models }
+          : prev);
+        return;
+      }
+      // Backend returned the full updated model list — use it directly
+      setModelsData({
+        provider: result.provider,
+        current_model: result.model ?? '',
+        models: result.models,
+      });
+      // Refresh capabilities (memory recommendation may change with new model)
+      const caps = await apiClient.getCapabilities();
+      if (caps?.model_info) setModelInfo(caps.model_info);
     } catch (err) {
+      setSwitchWarning('Failed to switch — check that the backend is running.');
       console.error('[ModelSwitch] Failed to switch model:', err);
     } finally {
       setIsSwitching(false);
@@ -244,7 +257,7 @@ function AppContent() {
     ) {
       console.log(`[ModelRestore] Restoring saved model: ${savedModel} (current: ${modelsData.current_model})`);
       modelRestoreAttempted.current = true;
-      handleModelSwitch(savedModel);
+      handleModelSwitch(modelsData.provider, savedModel);
     } else {
       // Nothing to restore — mark as done so we never retry
       modelRestoreAttempted.current = true;
@@ -747,6 +760,7 @@ function AppContent() {
                 modelsData={modelsData}
                 onModelSwitch={handleModelSwitch}
                 isSwitching={isSwitching}
+                switchWarning={switchWarning}
               />
             </>
           ) : (

@@ -24,6 +24,10 @@ _openai_client: EnhancedOpenAIClient = None
 _llamacpp_client: Optional[object] = None
 _llamacpp_embedding_manager: Optional[object] = None
 
+# True when the app started with LlamaCpp as the provider.
+# Used to keep the embedding backend fixed even if the chat provider is switched.
+_started_with_llamacpp: bool = False
+
 
 def set_managers(
     langchain_manager: LangChainEmbeddingManager,
@@ -31,25 +35,26 @@ def set_managers(
     openai_client: EnhancedOpenAIClient
 ):
     """Initialize the global manager instances. Called from main.py."""
-    global _langchain_manager, _mem0_manager, _openai_client
+    global _langchain_manager, _mem0_manager, _openai_client, _started_with_llamacpp
     _langchain_manager = langchain_manager
     _mem0_manager = mem0_manager
     _openai_client = openai_client
+    # langchain_manager is None when started with LlamaCpp (lazy-loaded instead)
+    _started_with_llamacpp = langchain_manager is None
 
 
 def get_langchain_manager() -> LangChainEmbeddingManager:
     """
-    Dependency to get the embedding manager based on provider.
-    
-    For llamacpp, returns the LlamaCppEmbeddingManager wrapped to be compatible.
-    For ollama/openai, returns the standard LangChainEmbeddingManager.
+    Dependency to get the embedding manager.
+
+    The embedding backend is fixed at startup — if the app started with LlamaCpp
+    we always use the LlamaCpp embedding manager regardless of the current chat
+    provider.  This preserves existing ChromaDB vector collections when the user
+    switches chat providers mid-session.
     """
-    from app.config import PROVIDER
-    
-    if PROVIDER == "llamacpp":
-        # Return LlamaCpp embedding manager for llamacpp provider
+    if _started_with_llamacpp:
         return get_llamacpp_embedding_manager()
-    
+
     if _langchain_manager is None:
         raise RuntimeError("LangChain manager not initialized")
     return _langchain_manager
@@ -64,17 +69,16 @@ def get_mem0_manager() -> Mem0MemoryManager:
 
 def get_openai_client() -> EnhancedOpenAIClient:
     """
-    Dependency to get the LLM client based on provider.
-    
-    For llamacpp, returns the LlamaCppClient.
-    For ollama/openai, returns the standard EnhancedOpenAIClient.
+    Dependency to get the LLM client based on the *current* chat provider.
+
+    Reads runtime_config.provider (not the static PROVIDER constant) so that
+    a mid-session provider switch is reflected immediately on the next request.
     """
-    from app.config import PROVIDER
-    
-    if PROVIDER == "llamacpp":
-        # Return LlamaCpp client for llamacpp provider
+    from app.config import runtime_config
+
+    if runtime_config.provider == "llamacpp":
         return get_llamacpp_client()
-    
+
     if _openai_client is None:
         raise RuntimeError("OpenAI client not initialized")
     return _openai_client
@@ -145,6 +149,18 @@ def set_llamacpp_client(new_client):
     # Reset so get_llamacpp_embedding_manager() rebuilds with the new client
     _llamacpp_embedding_manager = None
     logger.info("LlamaCpp client singleton replaced")
+
+
+def set_openai_client(new_client):
+    """
+    Replace the OpenAI/Ollama client singleton used for chat completions.
+
+    Called by POST /api/models/switch when switching to or between
+    Ollama/OpenAI providers.
+    """
+    global _openai_client
+    _openai_client = new_client
+    logger.info("OpenAI/Ollama client singleton replaced")
 
 
 def get_llamacpp_embedding_manager():

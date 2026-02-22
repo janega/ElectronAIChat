@@ -12,10 +12,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.config import (
-    APP_NAME, PROVIDER, OLLAMA_HOST, OPENAI_API_KEY, 
+    APP_NAME, PROVIDER, OLLAMA_HOST, OPENAI_API_KEY,
     ALLOW_ORIGINS, DATABASE_PATH, BASE_DIR, LOGS_DIR, IS_PACKAGED,
     DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OPENAI_LLM_MODEL,
     DEFAULT_OLLAMA_EMBED_MODEL, DEFAULT_OPENAI_EMBED_MODEL,
+    runtime_config,
     logger as cfg_logger
 )
 from app.embeddings import LangChainEmbeddingManager
@@ -71,7 +72,9 @@ async def lifespan(app: FastAPI):
     # Update global PROVIDER with detected value
     detected_provider = detection_result["provider"]
     config_module.PROVIDER = detected_provider
-    
+    # Keep runtime_config in sync — this is the live source of truth for route handlers
+    runtime_config.provider = detected_provider
+
     # Store Ollama process reference if we started it during detection
     ollama_process_ref = detection_result.get("process")
     

@@ -188,10 +188,17 @@ class RuntimeConfig:
     """
     Mutable runtime state. Module-level constants above are immutable after import;
     this singleton holds values that can change while the server is running
-    (e.g. when the user switches the active LlamaCpp model via the API).
+    (e.g. when the user switches the active provider or model via the API).
+
+    `provider` mirrors `config_module.PROVIDER` but is the single source of truth
+    once the server is running — always prefer reading `runtime_config.provider`
+    over the bare `PROVIDER` constant in route handlers.
     """
     def __init__(self):
+        # Set in main.py lifespan after auto-detection; defaults to env value for now
+        self.provider: str = PROVIDER
         self.llamacpp_chat_model: str = LLAMACPP_CHAT_MODEL
+        self.ollama_model: str = DEFAULT_OLLAMA_LLM_MODEL
 
 runtime_config = RuntimeConfig()
 
