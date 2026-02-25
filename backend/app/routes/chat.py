@@ -258,9 +258,19 @@ async def chat_stream(
                 session.commit()
                 logger.debug(f"Saved assistant response to database (chat: {payload.chatId})")
                 
-                # Auto-generate title after 4 messages (2 complete exchanges: user+assistant, user+assistant)
-                if len(chat.messages) == 4 and chat.title == "New Chat":
-                    logger.info(f"[Title Gen] Triggering title generation for chat {payload.chatId} (4 messages)")
+                # Auto-generate title after 4 messages (2 complete exchanges).
+                # Use a direct SQL count instead of the ORM relationship which may be
+                # stale after multiple commits within this request.  Use >= 4 so that
+                # the trigger fires even if the count somehow overshoots exactly 4.
+                try:
+                    from sqlmodel import func
+                    msg_count = session.exec(
+                        select(func.count()).select_from(Message).where(Message.chat_id == payload.chatId)
+                    ).one()
+                except Exception:
+                    msg_count = len(chat.messages)  # fallback to ORM relationship
+                if msg_count >= 4 and chat.title == "New Chat":
+                    logger.info(f"[Title Gen] Triggering title generation for chat {payload.chatId} ({msg_count} messages)")
                     # Fire and forget background task
                     asyncio.create_task(generate_title_background(payload.chatId, openai_client))
                     

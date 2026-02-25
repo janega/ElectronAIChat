@@ -46,12 +46,22 @@ async def generate_title_background(chat_id: str, openai_client: OpenAIClient):
 
 Title:"""
         
+        # Use the currently active model (runtime-switchable)
+        from app.config import runtime_config, DEFAULT_OPENAI_LLM_MODEL
+        if runtime_config.provider == "llamacpp":
+            active_model = runtime_config.llamacpp_chat_model
+        elif runtime_config.provider == "ollama":
+            active_model = runtime_config.ollama_model
+        else:
+            active_model = DEFAULT_OPENAI_LLM_MODEL
+        logger.debug(f"[Title Gen] Using model '{active_model}' (provider: {runtime_config.provider})")
+
         # Generate title with minimal tokens
         title_messages = [{"role": "user", "content": title_prompt}]
         full_title = ""
         
         async for chunk in openai_client.create_chat_completion(
-            model="llama2",  # Use fast model
+            model=active_model,
             messages=title_messages,
             temperature=0.3,  # Low temperature for consistency
             max_tokens=20,    # Short title only

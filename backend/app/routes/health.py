@@ -147,11 +147,14 @@ async def get_capabilities(request: Request):
             "recommended": gpu_info.get("recommended", False)
         }
 
-    # Model info - used by frontend to set memory default
-    if PROVIDER == "llamacpp":
+    # Model info - used by frontend to set memory default.
+    # IMPORTANT: read from runtime_config.provider, NOT the static PROVIDER constant.
+    # The static constant is a module-level import that is not updated when the user
+    # switches provider at runtime via POST /api/models/switch.
+    if runtime_config.provider == "llamacpp":
         current_model = runtime_config.llamacpp_chat_model
-    elif PROVIDER == "ollama":
-        current_model = DEFAULT_OLLAMA_LLM_MODEL
+    elif runtime_config.provider == "ollama":
+        current_model = runtime_config.ollama_model
     else:
         current_model = DEFAULT_OPENAI_LLM_MODEL
 

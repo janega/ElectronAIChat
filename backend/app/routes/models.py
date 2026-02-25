@@ -6,7 +6,9 @@ Handles listing available models and switching the active provider/model at
 runtime without requiring a backend restart.
 """
 import re
+import asyncio
 import logging
+import subprocess
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -78,6 +80,50 @@ def _pick_best_model(available: List[str], preferred: Optional[str]) -> Optional
     return sorted(available, key=sort_key)[0]
 
 
+async def _is_ollama_reachable() -> bool:
+    """Return True if Ollama is currently reachable."""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(f"{OLLAMA_HOST}/api/tags")
+            return resp.status_code == 200
+    except Exception:
+        return False
+
+
+async def _ensure_ollama_running() -> bool:
+    """
+    Check if Ollama is reachable; if not, attempt to start it via `ollama serve`.
+    Returns True if Ollama is reachable after attempts, False otherwise.
+    """
+    if await _is_ollama_reachable():
+        return True
+
+    logger.info("Ollama not reachable — attempting to start 'ollama serve'...")
+    try:
+        subprocess.Popen(
+            ["ollama", "serve"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),  # Windows: no console
+        )
+    except FileNotFoundError:
+        logger.warning("'ollama' executable not found in PATH — is Ollama installed?")
+        return False
+    except Exception as exc:
+        logger.warning(f"Failed to spawn 'ollama serve': {exc}")
+        return False
+
+    # Poll up to 10 s for Ollama to become ready
+    for _ in range(10):
+        await asyncio.sleep(1)
+        if await _is_ollama_reachable():
+            logger.info("Ollama started successfully")
+            return True
+
+    logger.warning("Ollama did not become reachable within 10 s")
+    return False
+
+
 async def _fetch_ollama_models() -> List[str]:
     """Query Ollama for available model tags. Returns empty list on failure."""
     try:
@@ -145,17 +191,32 @@ async def switch_model(
     # -----------------------------------------------------------------------
     # 1. Gather available models for the target provider
     # -----------------------------------------------------------------------
+    warning = None
+
     if new_provider == "llamacpp":
         try:
             available = sorted([f.name for f in LLAMACPP_MODELS_DIR.glob("*.gguf")])
         except Exception:
             available = []
     elif new_provider == "ollama":
+        # Attempt to start Ollama if it isn't running
+        ollama_running = await _ensure_ollama_running()
+        if not ollama_running:
+            return {
+                "success": False,
+                "provider": new_provider,
+                "model": None,
+                "models": [],
+                "changed": False,
+                "warning": (
+                    "Ollama is not running and could not be started automatically. "
+                    "Install Ollama from https://ollama.com and run 'ollama serve'."
+                ),
+            }
         available = await _fetch_ollama_models()
     else:  # openai
         available = ["gpt-4o", "gpt-4o-mini"]
 
-    warning = None
     if not available and new_provider in ("llamacpp", "ollama"):
         warning = (
             f"No models found for provider '{new_provider}'. "
@@ -252,6 +313,14 @@ async def switch_model(
 
         elif new_provider == "ollama":
             if provider_changed:
+                # Unload LlamaCpp chat model if switching away from it to free memory
+                if current_provider == "llamacpp":
+                    try:
+                        current_client = get_llamacpp_client()
+                        current_client.unload()
+                        logger.info("Unloaded LlamaCpp chat model (switching to Ollama)")
+                    except Exception as e:
+                        logger.warning(f"Could not unload LlamaCpp model: {e}")
                 # Build a fresh Ollama client
                 from app.openai_client import EnhancedOpenAIClient
                 new_client = EnhancedOpenAIClient(
@@ -264,6 +333,14 @@ async def switch_model(
 
         elif new_provider == "openai":
             if provider_changed:
+                # Unload LlamaCpp chat model if switching away from it to free memory
+                if current_provider == "llamacpp":
+                    try:
+                        current_client = get_llamacpp_client()
+                        current_client.unload()
+                        logger.info("Unloaded LlamaCpp chat model (switching to OpenAI)")
+                    except Exception as e:
+                        logger.warning(f"Could not unload LlamaCpp model: {e}")
                 from app.config import OPENAI_API_KEY
                 from app.openai_client import EnhancedOpenAIClient
                 new_client = EnhancedOpenAIClient(
