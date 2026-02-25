@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Menu, X, Settings, Plus, Sun, Moon, Wifi, WifiOff, Loader2 } from 'lucide-react';
-import { PageType, DocumentWithStatus, Message } from './types';
+import { Loader2 } from 'lucide-react';
+import { DocumentWithStatus, Message } from './types';
 import { useTheme, useSettings, useChatHistory, useChat } from './hooks';
 import { apiClient } from './utils/api';
 import type { ModelInfo, ModelsResponse } from './utils/api';
@@ -10,10 +10,11 @@ import './styles/utils.css';
 import { 
   ChatWindow, 
   MessageInput,
-  ChatControls,
-  ModelBar,
-  Sidebar, 
+  Sidebar,
+  type RightPanelType,
   SettingsPage,
+  DocsPanel,
+  MemoryPanel,
   UsernameModal
 } from './components/index';
 
@@ -49,8 +50,7 @@ function AppContent() {
   const { messages, setMessages, isLoading, sendMessage, stopStream, cleanup } =
     useChat();
 
-  const [currentPage, setCurrentPage] = useState<PageType>('chat');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [rightPanel, setRightPanel] = useState<RightPanelType>(null);
   const [uploadedDocs, setUploadedDocs] = useState<DocumentWithStatus[]>([]);
   const [searchMode, setSearchMode] = useState('normal');
   const [useMemory, setUseMemory] = useState(true);
@@ -494,6 +494,10 @@ function AppContent() {
     }
   };
 
+  const handleRenameChat = async (chatId: string, newTitle: string) => {
+    await updateChat(chatId, { title: newTitle });
+  };
+
   const handleUploadDocument = async (files: FileList | null) => {
     if (!currentChatId || !files || !username) return;
 
@@ -572,234 +576,174 @@ function AppContent() {
     }
   };
 
-  if (currentPage === 'settings') {
-    return (
-      <div className={`${isDark ? 'dark' : ''}`}>
-        <div className="flex h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
-          <Sidebar
-            isOpen={sidebarOpen}
-            chats={chats}
-            currentChatId={currentChatId}
-            onSelectChat={handleSelectChat}
-            onNewChat={createNewChat}
-            onDeleteChat={deleteChat}
-            isDark={isDark}
-          />
-
-          <div className="flex-1 flex flex-col">
-            <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 flex items-center justify-between">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
-              >
-                {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-              </button>
-
-              <h1 className="text-xl font-semibold">Settings</h1>
-
-              <div className="flex items-center gap-2">
-                <div className="relative group">
-                  <div
-                    className={`w-3 h-3 rounded-full ${
-                      backendConnected ? 'bg-green-500' : 'bg-red-500'
-                    }`}
-                    title={backendConnected ? 'Connected' : 'Disconnected'}
-                  />
-                  <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                    {backendConnected ? 'Connected' : 'Disconnected'}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsDark(!isDark)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
-                >
-                  {isDark ? <Sun size={20} /> : <Moon size={20} />}
-                </button>
-              </div>
-            </header>
-
-            <SettingsPage
-              isDark={isDark}
-              onBack={() => setCurrentPage('chat')}
-              settings={settings}
-              onSettingChange={updateSetting}
-              onTestBackend={checkBackendStatus}
-              backendConnected={backendConnected}
-              userId={userId}
-              saveStatus={saveStatus}
-              saveError={saveError}
-              onSaveSettings={() => userId && saveSettingsToBackend(userId)}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ── Chat panel top bar label for search mode ──
+  const searchModeLabel: Record<string, string> = {
+    normal: 'LLM', embeddings: 'RAG', all: 'ALL',
+  };
 
   return (
-    <div className={`${isDark ? 'dark' : ''}`}>
-      <div className="flex h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
-        <Sidebar
-          isOpen={sidebarOpen}
-          chats={chats}
-          currentChatId={currentChatId}
-          onSelectChat={handleSelectChat}
-          onNewChat={handleNewChat}
-          onDeleteChat={deleteChat}
-          isDark={isDark}
-          isCreatingChat={isCreatingChat}
-        />
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', background: '#1E1E1E', overflow: 'hidden' }}>
+      {/* Left Sidebar */}
+      <Sidebar
+        chats={chats}
+        currentChatId={currentChatId}
+        onSelectChat={handleSelectChat}
+        onNewChat={handleNewChat}
+        onDeleteChat={deleteChat}
+        onRenameChat={handleRenameChat}
+        rightPanel={rightPanel}
+        onRightPanelChange={setRightPanel}
+        isCreatingChat={isCreatingChat}
+      />
 
-        <div className="flex-1 flex flex-col">
-          <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 flex items-center justify-between">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+      {/* Main Chat Panel */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Top bar */}
+        <div style={{
+          height: 42, background: '#2D2D2D',
+          borderBottom: '1px solid #1A1A1A',
+          display: 'flex', alignItems: 'center',
+          padding: '0 16px', gap: 10, flexShrink: 0,
+        }}>
+          <span style={{
+            fontSize: 12, color: '#CCCCCC',
+            fontFamily: 'var(--font-mono)', flex: 1,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {currentChat?.title || (currentChatId ? 'Chat' : 'ElectronAIChat')}
+          </span>
+          {/* Backend warnings dot */}
+          {backendWarnings.length > 0 && showWarnings && (
+            <span
+              title={backendWarnings.map((w: any) => `[${w.component}] ${w.message}`).join('\n')}
+              style={{ fontSize: 10, color: '#DCDCAA', fontFamily: 'var(--font-mono)', cursor: 'default' }}
             >
-              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-
-            <h1 className="text-xl font-semibold">Welcome {username}</h1>
-
-            <div className="flex items-center gap-2">
-              <div className="relative group">
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    backendConnected ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                  title={backendConnected ? 'Connected' : 'Disconnected'}
-                />
-                <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                  {backendConnected ? 'Connected' : 'Disconnected'}
-                </div>
-              </div>
-              <button
-                onClick={() => setIsDark(!isDark)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
-              >
-                {isDark ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-              <button
-                onClick={() => setCurrentPage('settings')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
-              >
-                <Settings size={20} />
-              </button>
-            </div>
-          </header>
-
-          {currentChatId ? (
-            <>
-              {/* Backend Warnings Banner */}
-              {backendWarnings.length > 0 && showWarnings && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <h3 className="font-semibold text-yellow-800 dark:text-yellow-300">Backend Configuration Issues</h3>
-                      </div>
-                      <div className="space-y-2">
-                        {backendWarnings.map((warning: any, idx: number) => (
-                          <div key={idx} className="text-sm">
-                            <p className="text-yellow-900 dark:text-yellow-200 font-medium">
-                              [{warning.component}] {warning.message}
-                            </p>
-                            <p className="text-yellow-700 dark:text-yellow-400 mt-1">
-                              → {warning.suggestion}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowWarnings(false)}
-                      className="p-1 hover:bg-yellow-100 dark:hover:bg-yellow-800/30 rounded transition"
-                      title="Dismiss"
-                    >
-                      <X size={18} className="text-yellow-600 dark:text-yellow-400" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <ChatWindow
-                messages={messages}
-                isLoading={isLoading}
-                messagesEndRef={messagesEndRef}
-                isDark={isDark}
-                onRetryMessage={handleRetryMessage}
-              />
-
-              <ChatControls
-                uploadedDocs={uploadedDocs}
-                searchMode={searchMode}
-                onSearchModeChange={(mode) => {
-                  setSearchMode(mode);
-                  updateChat(currentChatId, { searchMode: mode as any });
-                }}
-                useMemory={useMemory}
-                onUseMemoryChange={setUseMemory}
-                onUpload={handleUploadDocument}
-                isLoading={isLoading}
-                isExpanded={isInputExpanded}
-                onToggleExpand={() => setIsInputExpanded(!isInputExpanded)}
-                modelInfo={modelInfo}
-              />
-
-              <MessageInput
-                onSend={handleSendMessage}
-                onStop={handleStopStream}
-                isLoading={isLoading}
-                isExpanded={isInputExpanded}
-              />
-
-              <ModelBar
-                modelsData={modelsData}
-                onModelSwitch={handleModelSwitch}
-                isSwitching={isSwitching}
-                switchWarning={switchWarning}
-              />
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-4 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
-              <div className="text-center">
-                <h2 className="text-3xl font-bold mb-4">Welcome to AI Chat with RAG</h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-8">
-                  Start a new conversation or select one from the sidebar.
-                </p>
-                <button
-                  onClick={handleNewChat}
-                  disabled={isCreatingChat}
-                  className={`px-6 py-3 rounded-lg transition flex items-center gap-2 mx-auto ${
-                    isCreatingChat
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
-                >
-                  {isCreatingChat ? (
-                    <>
-                      <Loader2 size={20} className="animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={20} />
-                      New Chat
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+              ⚠ {backendWarnings.length}
+            </span>
+          )}
+          {/* Search mode badge */}
+          <span style={{
+            fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
+            color: '#4EC9B0', background: 'rgba(78,201,176,0.1)',
+            border: '1px solid rgba(78,201,176,0.25)', borderRadius: 3, padding: '1px 6px',
+          }}>
+            {searchModeLabel[searchMode] || 'LLM'}
+          </span>
+          {/* Model badge */}
+          {modelsData?.current_model && (
+            <span style={{
+              fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
+              color: '#569CD6', background: 'rgba(86,156,214,0.1)',
+              border: '1px solid rgba(86,156,214,0.25)', borderRadius: 3, padding: '1px 6px',
+              maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {modelsData.current_model}
+            </span>
           )}
         </div>
+
+        {currentChatId ? (
+          <>
+            <ChatWindow
+              messages={messages}
+              isLoading={isLoading}
+              messagesEndRef={messagesEndRef}
+              isDark={isDark}
+              onRetryMessage={handleRetryMessage}
+            />
+
+            <MessageInput
+              onSend={handleSendMessage}
+              onStop={handleStopStream}
+              isLoading={isLoading}
+              temperature={settings.temperature}
+              maxTokens={settings.maxTokens}
+            />
+          </>
+        ) : (
+          <div style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 10, margin: '0 auto 16px',
+                background: 'linear-gradient(135deg,#4EC9B0,#569CD6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, color: '#1E1E1E', fontWeight: 700,
+                fontFamily: 'var(--font-mono)',
+              }}>
+                AI
+              </div>
+              <p style={{ fontSize: 18, color: '#CCCCCC', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>
+                Welcome to ElectronAIChat
+              </p>
+              <p style={{ fontSize: 12, color: '#555555', fontFamily: 'var(--font-mono)', marginBottom: 24 }}>
+                Select a chat or start a new conversation
+              </p>
+              <button
+                onClick={handleNewChat}
+                disabled={isCreatingChat}
+                style={{
+                  padding: '8px 20px', background: 'transparent',
+                  border: '1px solid rgba(78,201,176,0.4)',
+                  borderRadius: 4, color: '#4EC9B0', fontSize: 12,
+                  cursor: isCreatingChat ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font-mono)', opacity: isCreatingChat ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto',
+                }}
+              >
+                {isCreatingChat ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Creating…
+                  </>
+                ) : (
+                  <><span style={{ fontSize: 16 }}>+</span> New Chat</>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Right Panels */}
+      {rightPanel === 'docs' && (
+        <DocsPanel
+          uploadedDocs={uploadedDocs}
+          searchMode={searchMode}
+          onSearchModeChange={(mode) => {
+            setSearchMode(mode);
+            if (currentChatId) updateChat(currentChatId, { searchMode: mode as any });
+          }}
+          onUpload={handleUploadDocument}
+          isLoading={isLoading}
+        />
+      )}
+      {rightPanel === 'memory' && (
+        <MemoryPanel />
+      )}
+      {rightPanel === 'settings' && (
+        <SettingsPage
+          isDark={isDark}
+          settings={settings}
+          onSettingChange={updateSetting}
+          backendConnected={backendConnected}
+          userId={userId}
+          saveStatus={saveStatus}
+          saveError={saveError}
+          onSaveSettings={() => userId && saveSettingsToBackend(userId)}
+          modelsData={modelsData}
+          onModelSwitch={handleModelSwitch}
+          useMemory={useMemory}
+          onUseMemoryChange={setUseMemory}
+          onThemeChange={(dark) => setIsDark(dark)}
+        />
+      )}
 
       {/* Username Modal */}
       {showUsernameModal && (
-        <UsernameModal 
+        <UsernameModal
           onUsernameSet={handleUsernameSet}
           isLoading={isSyncing}
         />
@@ -807,14 +751,20 @@ function AppContent() {
 
       {/* Loading Overlay during initial sync */}
       {isInitializing && !showUsernameModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 text-center">
-            <svg className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+        }}>
+          <div style={{
+            background: '#2D2D2D', borderRadius: 8, padding: '32px 40px',
+            textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)',
+          }}>
+            <svg style={{ width: 40, height: 40, color: '#4EC9B0', margin: '0 auto 16px' }} className="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p className="text-gray-900 dark:text-gray-100 text-lg font-medium">
-              Syncing your chats...
+            <p style={{ color: '#CCCCCC', fontSize: 14, fontFamily: 'var(--font-mono)' }}>
+              Syncing your chats…
             </p>
           </div>
         </div>

@@ -1,50 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Default light theme variables */
+/* VS Code dark theme color palette */
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --border: #e2e8f0;
-  --accent: #3b82f6;
-}
+  --c-bg: #1E1E1E;
+  --c-surface: #252526;
+  --c-raised: #2D2D2D;
+  --c-border: #1A1A1A;
+  --c-divider: rgba(255,255,255,0.06);
+  --c-input: #3C3C3C;
+  --c-teal: #4EC9B0;
+  --c-blue: #569CD6;
+  --c-yellow: #DCDCAA;
+  --c-orange: #CE9178;
+  --c-red: #F44747;
+  --c-text-hi: #E8E8E8;
+  --c-text-mid: #CCCCCC;
+  --c-text-lo: #858585;
+  --c-text-faint: #555555;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-sans: 'Segoe UI', system-ui, sans-serif;
 
-/* Dark theme overrides */
-html.dark,
-.dark {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --accent: #60a5fa;
+  /* Legacy theme variables kept for compatibility */
+  --bg-primary: #1E1E1E;
+  --bg-secondary: #252526;
+  --text-primary: #E8E8E8;
+  --text-secondary: #CCCCCC;
+  --border: #1A1A1A;
+  --accent: #4EC9B0;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  background-color: var(--c-bg);
+  color: var(--c-text-hi);
   overflow: hidden;
-}
-
-html.dark {
-  color-scheme: dark;
 }
 
 #root {
@@ -52,10 +52,10 @@ html.dark {
   width: 100vw;
 }
 
-/* Custom scrollbar */
+/* Thin scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -63,20 +63,12 @@ html.dark {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
+  background: #3C3C3C;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
-html.dark ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-}
-
-html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #4C4C4C;
 }
 
 /* Focus styles */
@@ -86,14 +78,30 @@ select:focus {
   outline: none;
 }
 
-/* Animation for loading spinner */
+/* Streaming cursor blink animation */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Streaming pulse dot animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Loading bounce animation */
 @keyframes bounce {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1s infinite;
 }
 
 .animate-bounce {

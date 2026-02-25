@@ -1,419 +1,366 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AppSettings } from '../types';
 import { apiClient } from '../utils/api';
-import { Trash2, Loader2, Check, X } from 'lucide-react';
+import type { ModelsResponse } from '../utils/api';
 
 interface SettingsPageProps {
   isDark: boolean;
-  onBack: () => void;
+  onBack?: () => void;
   settings: AppSettings;
-  onSettingChange: <K extends keyof AppSettings>(
-    key: K,
-    value: AppSettings[K]
-  ) => void;
+  onSettingChange: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   onTestBackend?: () => Promise<void>;
   backendConnected?: boolean;
   userId: string | null;
   saveStatus: 'idle' | 'saving' | 'success' | 'error';
   saveError: string | null;
   onSaveSettings: () => void;
+  modelsData?: ModelsResponse | null;
+  onModelSwitch?: (provider: string, model?: string) => Promise<void>;
+  useMemory?: boolean;
+  onUseMemoryChange?: (enabled: boolean) => void;
+  onThemeChange?: (dark: boolean) => void;
 }
+
+const GearIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{
+        fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)',
+        letterSpacing: '0.1em', textTransform: 'uppercase', padding: '10px 14px 6px',
+      }}>
+        {label}
+      </div>
+      <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div
+      onClick={() => onChange(!enabled)}
+      style={{
+        width: 34, height: 18, borderRadius: 9, cursor: 'pointer',
+        background: enabled ? '#4EC9B0' : '#3C3C3C',
+        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 2, left: enabled ? 18 : 2,
+        width: 14, height: 14, borderRadius: '50%',
+        background: enabled ? '#1E1E1E' : '#858585',
+        transition: 'left 0.2s',
+      }} />
+    </div>
+  );
+}
+
+const PROVIDER_OPTIONS = ['ollama', 'openai', 'llamacpp'] as const;
 
 export function SettingsPage({
   isDark,
-  onBack,
   settings,
   onSettingChange,
-  onTestBackend,
   backendConnected,
   userId,
   saveStatus,
   saveError,
   onSaveSettings,
+  modelsData,
+  onModelSwitch,
+  useMemory = true,
+  onUseMemoryChange,
+  onThemeChange,
 }: SettingsPageProps) {
-  const [testingBackend, setTestingBackend] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    success: boolean;
-    message: string;
-  } | null>(null);
+  const provider = modelsData?.provider ?? 'ollama';
+  const currentModel = modelsData?.current_model ?? settings.model;
+  const models = modelsData?.models ?? [];
   const [isResetting, setIsResetting] = useState(false);
 
-  const handleTestBackend = async () => {
-    setTestingBackend(true);
-    setTestResult(null);
-
-    try {
-      const response = await apiClient.checkStatus();
-      setTestResult({
-        success: true,
-        message: JSON.stringify(response, null, 2),
-      });
-      if (onTestBackend) {
-        await onTestBackend();
-      }
-    } catch (error) {
-      setTestResult({
-        success: false,
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
-    } finally {
-      setTestingBackend(false);
-    }
-  };
-
   const handleResetApplication = async () => {
-    // First confirmation
     const firstConfirm = window.confirm(
-      '⚠️ WARNING: This will permanently delete:\n\n' +
-      '• All chats and messages\n' +
-      '• All uploaded documents\n' +
-      '• All settings and preferences\n' +
-      '• Long-term memory (Mem0)\n\n' +
-      'This action CANNOT be undone!\n\n' +
-      'Are you sure you want to continue?'
+      '⚠️ WARNING: This will permanently delete all chats, documents, settings, and memory.\n\nThis action CANNOT be undone!\n\nAre you sure?'
     );
-
     if (!firstConfirm) return;
-
-    // Second confirmation (extra safety)
-    const secondConfirm = window.confirm(
-      'FINAL CONFIRMATION:\n\n' +
-      'This will delete ALL your data from both your device and the backend.\n\n' +
-      'Click OK to proceed, or Cancel to abort.'
-    );
-
+    const secondConfirm = window.confirm('FINAL CONFIRMATION: Click OK to proceed, or Cancel to abort.');
     if (!secondConfirm) return;
-
     setIsResetting(true);
-
     try {
-      // 1. Tell backend to wipe its data
       await apiClient.request('/api/admin/reset', { method: 'POST' });
-      
-      // 2. Clear all localStorage
       localStorage.clear();
-      
-      // 3. Show success message before reload
       alert('✅ Application reset complete. The app will now reload.');
-      
-      // 4. Reload app to force fresh start
       window.location.reload();
-      
     } catch (error) {
-      console.error('[Settings] Reset failed:', error);
-      
-      const platform = navigator.platform.toLowerCase();
-      const dataPath = platform.includes('win')
-        ? '%APPDATA%\\ElectronAIChat'
-        : platform.includes('mac')
-        ? '~/Library/Application Support/ElectronAIChat'
-        : '~/.config/ElectronAIChat';
-      
-      alert(
-        `Failed to reset application:\n\n${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
-        'You may need to manually delete data from:\n' +
-        `• ${dataPath}`
-      );
+      alert(`Failed to reset: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsResetting(false);
     }
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-white dark:bg-gray-950">
-      <div className="max-w-2xl mx-auto">
-        <button
-          onClick={onBack}
-          className="mb-6 px-4 py-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          ← Back to Chat
-        </button>
+    <div style={{
+      width: 260, background: '#252526',
+      borderLeft: '1px solid #1A1A1A',
+      display: 'flex', flexDirection: 'column', flexShrink: 0,
+    }}>
+      {/* Header */}
+      <div style={{
+        height: 42, borderBottom: '1px solid #1A1A1A',
+        display: 'flex', alignItems: 'center', gap: 7, padding: '0 14px', flexShrink: 0,
+      }}>
+        <span style={{ color: '#858585' }}><GearIcon /></span>
+        <span style={{
+          fontSize: 11, color: '#CCCCCC', fontWeight: 600,
+          letterSpacing: '0.06em', textTransform: 'uppercase',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          Settings
+        </span>
+        {/* Backend status dot */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: backendConnected ? '#4EC9B0' : '#F44747',
+            display: 'inline-block', flexShrink: 0,
+          }} />
+          <span style={{ fontSize: 9, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+            {backendConnected ? 'online' : 'offline'}
+          </span>
+        </div>
+      </div>
 
-        <h1 className="text-3xl font-bold mb-8">Settings</h1>
-
-        <div className="space-y-8">
-          {/* Backend Connection Test */}
-          <div className="border-b border-gray-200 dark:border-gray-800 pb-8">
-            <h2 className="text-xl font-semibold mb-6">Backend Connection</h2>
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${
-                    backendConnected ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                />
-                <span className="font-medium">
-                  Status: {backendConnected ? 'Connected' : 'Disconnected'}
-                </span>
-              </div>
-
-              <button
-                onClick={handleTestBackend}
-                disabled={testingBackend}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {testingBackend ? 'Testing...' : 'Test Backend Connection'}
-              </button>
-
-              {testResult && (
-                <div
-                  className={`p-4 rounded-lg ${
-                    testResult.success
-                      ? 'bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700'
-                      : 'bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700'
-                  }`}
+      {/* Scrollable content */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* LLM Provider */}
+        <Section label="LLM Provider">
+          <div style={{ display: 'flex', gap: 4 }}>
+            {PROVIDER_OPTIONS.map((p) => {
+              const isActive = provider === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => onModelSwitch && onModelSwitch(p)}
+                  style={{
+                    flex: 1, padding: '5px 0', fontFamily: 'var(--font-mono)',
+                    fontSize: 10, cursor: 'pointer', borderRadius: 3,
+                    background: isActive ? 'rgba(86,156,214,0.12)' : 'transparent',
+                    border: isActive ? '1px solid #569CD6' : '1px solid #3C3C3C',
+                    color: isActive ? '#569CD6' : '#858585',
+                  }}
                 >
-                  <p
-                    className={`font-semibold mb-2 ${
-                      testResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
-                    }`}
-                  >
-                    {testResult.success ? 'Success!' : 'Error'}
-                  </p>
-                  <pre className="text-sm overflow-x-auto whitespace-pre-wrap">
-                    {testResult.message}
-                  </pre>
-                </div>
-              )}
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+          {provider === 'ollama' && (
+            <div>
+              <div style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>Host</div>
+              <input
+                defaultValue={settings.ollamaHost || 'http://localhost:11434'}
+                style={{
+                  width: '100%', background: '#3C3C3C',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 4, padding: '6px 9px', color: '#CCCCCC',
+                  fontSize: 11, fontFamily: 'var(--font-mono)', outline: 'none',
+                }}
+              />
             </div>
-          </div>
-
-          {/* Generation Parameters */}
-          <div className="border-b border-gray-200 dark:border-gray-800 pb-8">
-            <h2 className="text-xl font-semibold mb-6">Generation Parameters</h2>
-
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Temperature: {settings.temperature.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={settings.temperature}
-                  onChange={(e) =>
-                    onSettingChange('temperature', parseFloat(e.target.value))
-                  }
-                  className="w-full"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  Higher values = more random, Lower values = more focused (0-2)
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Max Tokens
-                </label>
-                <input
-                  type="number"
-                  value={settings.maxTokens}
-                  onChange={(e) =>
-                    onSettingChange('maxTokens', parseInt(e.target.value))
-                  }
-                  min="1"
-                  max="4096"
-                  className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Maximum number of tokens to generate
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Top P: {settings.topP.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={settings.topP}
-                  onChange={(e) =>
-                    onSettingChange('topP', parseFloat(e.target.value))
-                  }
-                  className="w-full"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  Nucleus sampling parameter (0-1)
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Top K</label>
-                <input
-                  type="number"
-                  value={settings.topK}
-                  onChange={(e) =>
-                    onSettingChange('topK', parseInt(e.target.value))
-                  }
-                  min="1"
-                  max="100"
-                  className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Top K token filtering parameter
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* System Prompt */}
-          <div className="border-b border-gray-200 dark:border-gray-800 pb-8">
-            <h2 className="text-xl font-semibold mb-6">System Prompt</h2>
-
-            <textarea
-              value={settings.systemPrompt}
-              onChange={(e) =>
-                onSettingChange('systemPrompt', e.target.value)
-              }
-              placeholder="You are a helpful assistant..."
-              rows={8}
-              className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Define the behavior and personality of the AI assistant
-            </p>
-          </div>
-
-          {/* Save Settings Button */}
-          <div className="border-b border-gray-200 dark:border-gray-800 pb-8">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onSaveSettings}
-                disabled={saveStatus === 'saving' || !userId || !backendConnected}
-                className={`px-6 py-3 rounded-lg transition font-medium ${
-                  saveStatus === 'saving' || !userId || !backendConnected
-                    ? 'bg-gray-400 cursor-not-allowed text-white'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
+          )}
+          {/* Model selector */}
+          <div>
+            <div style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>Model</div>
+            {models.length > 1 ? (
+              <select
+                value={currentModel}
+                onChange={(e) => onModelSwitch && onModelSwitch(provider, e.target.value)}
+                style={{
+                  width: '100%', background: '#3C3C3C',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 4, padding: '6px 9px', color: '#CCCCCC',
+                  fontSize: 11, fontFamily: 'var(--font-mono)', outline: 'none',
+                  cursor: 'pointer',
+                }}
               >
-                {saveStatus === 'saving' ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 size={18} className="animate-spin" />
-                    Saving...
-                  </span>
-                ) : (
-                  'Save Settings'
-                )}
-              </button>
-
-              {saveStatus === 'success' && (
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 animate-in fade-in duration-200">
-                  <Check size={20} />
-                  <span className="font-medium">Settings saved!</span>
-                </div>
-              )}
-
-              {saveStatus === 'error' && (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                    <X size={20} />
-                    <span className="font-medium">Failed to save: {saveError}</span>
-                  </div>
-                  <button
-                    onClick={onSaveSettings}
-                    className="text-sm text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {(!userId || !backendConnected) && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                ⚠️ {!userId ? 'User ID not available' : 'Backend must be running to save settings'}
-              </p>
+                {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            ) : (
+              <input
+                defaultValue={currentModel}
+                style={{
+                  width: '100%', background: '#3C3C3C',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 4, padding: '6px 9px', color: '#CCCCCC',
+                  fontSize: 11, fontFamily: 'var(--font-mono)', outline: 'none',
+                }}
+              />
             )}
           </div>
+        </Section>
 
-          {/* Danger Zone */}
-          <div className="border-2 border-red-500 dark:border-red-700 rounded-lg p-6 bg-red-50 dark:bg-red-950/20">
-            <h2 className="text-xl font-semibold mb-4 text-red-600 dark:text-red-400 flex items-center gap-2">
-              <Trash2 size={24} />
-              Danger Zone
-            </h2>
-            
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-red-600 dark:text-red-400 mb-2">
-                  Reset Application
-                </h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                  Permanently delete all chats, messages, uploaded documents, and settings. 
-                  This will wipe both local cache and backend database.
-                </p>
-                <button
-                  onClick={handleResetApplication}
-                  disabled={isResetting || !backendConnected}
-                  className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
-                    isResetting || !backendConnected
-                      ? 'bg-gray-400 cursor-not-allowed text-white'
-                      : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
-                >
-                  {isResetting ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Resetting...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 size={18} />
-                      Reset Application
-                    </>
-                  )}
-                </button>
-                
-                {!backendConnected && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                    ⚠️ Backend must be running to reset application data
-                  </p>
-                )}
-              </div>
-
-              {/* Data Location Info */}
-              <div className="text-xs text-gray-600 dark:text-gray-400 mt-4 p-3 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-800">
-                <p className="font-semibold mb-2">Application Data Locations:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Frontend Cache: Browser localStorage</li>
-                  <li>
-                    Backend Database: {
-                      navigator.platform.toLowerCase().includes('win')
-                        ? '%APPDATA%\\ElectronAIChat\\chat_history.db' 
-                        : navigator.platform.toLowerCase().includes('mac')
-                        ? '~/Library/Application Support/ElectronAIChat/chat_history.db'
-                        : '~/.config/ElectronAIChat/chat_history.db'
-                    }
-                  </li>
-                  <li>
-                    Document Embeddings: {
-                      navigator.platform.toLowerCase().includes('win')
-                        ? '%APPDATA%\\ElectronAIChat\\chroma_db\\'
-                        : navigator.platform.toLowerCase().includes('mac')
-                        ? '~/Library/Application Support/ElectronAIChat/chroma_db/'
-                        : '~/.config/ElectronAIChat/chroma_db/'
-                    }
-                  </li>
-                  <li>
-                    Memory Store: {
-                      navigator.platform.toLowerCase().includes('win')
-                        ? '%APPDATA%\\ElectronAIChat\\chroma_db\\mem0\\'
-                        : navigator.platform.toLowerCase().includes('mac')
-                        ? '~/Library/Application Support/ElectronAIChat/chroma_db/mem0/'
-                        : '~/.config/ElectronAIChat/chroma_db/mem0/'
-                    }
-                  </li>
-                </ul>
-              </div>
+        {/* Generation */}
+        <Section label="Generation">
+          {/* Temperature */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>Temperature</span>
+              <span style={{ fontSize: 10, color: '#4EC9B0', fontFamily: 'var(--font-mono)' }}>{settings.temperature.toFixed(2)}</span>
             </div>
+            <input
+              type="range" min={0} max={2} step={0.05}
+              value={settings.temperature}
+              onChange={(e) => onSettingChange('temperature', parseFloat(e.target.value))}
+              style={{ width: '100%', accentColor: '#4EC9B0', cursor: 'pointer' }}
+            />
           </div>
-        </div>
+          {/* Max Tokens */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>Max Tokens</span>
+              <span style={{ fontSize: 10, color: '#569CD6', fontFamily: 'var(--font-mono)' }}>{settings.maxTokens}</span>
+            </div>
+            <input
+              type="range" min={256} max={8192} step={256}
+              value={settings.maxTokens}
+              onChange={(e) => onSettingChange('maxTokens', parseInt(e.target.value))}
+              style={{ width: '100%', accentColor: '#569CD6', cursor: 'pointer' }}
+            />
+          </div>
+          {/* Top P */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>Top P</span>
+              <span style={{ fontSize: 10, color: '#DCDCAA', fontFamily: 'var(--font-mono)' }}>{settings.topP.toFixed(2)}</span>
+            </div>
+            <input
+              type="range" min={0} max={1} step={0.05}
+              value={settings.topP}
+              onChange={(e) => onSettingChange('topP', parseFloat(e.target.value))}
+              style={{ width: '100%', accentColor: '#DCDCAA', cursor: 'pointer' }}
+            />
+          </div>
+        </Section>
+
+        {/* System Prompt */}
+        <Section label="System Prompt">
+          <textarea
+            value={settings.systemPrompt}
+            onChange={(e) => onSettingChange('systemPrompt', e.target.value)}
+            rows={4}
+            placeholder="You are a helpful AI assistant…"
+            style={{
+              width: '100%', background: '#3C3C3C',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 4, padding: '8px 10px', color: '#D4D4D4',
+              fontSize: 11, fontFamily: 'var(--font-sans)',
+              resize: 'vertical', lineHeight: 1.6, outline: 'none',
+            }}
+          />
+        </Section>
+
+        {/* Features */}
+        <Section label="Features">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, color: '#CCCCCC', fontFamily: 'var(--font-sans)' }}>
+              Long-term Memory (Mem0)
+            </span>
+            <ToggleSwitch enabled={useMemory} onChange={(v) => onUseMemoryChange && onUseMemoryChange(v)} />
+          </div>
+        </Section>
+
+        {/* Appearance */}
+        <Section label="Appearance">
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['dark', 'light'] as const).map((t) => {
+              const isActive = isDark ? t === 'dark' : t === 'light';
+              return (
+                <button
+                  key={t}
+                  onClick={() => onThemeChange && onThemeChange(t === 'dark')}
+                  style={{
+                    flex: 1, padding: '5px 0', fontFamily: 'var(--font-mono)',
+                    fontSize: 10, cursor: 'pointer', borderRadius: 3,
+                    background: isActive ? 'rgba(78,201,176,0.12)' : 'transparent',
+                    border: isActive ? '1px solid #4EC9B0' : '1px solid #3C3C3C',
+                    color: isActive ? '#4EC9B0' : '#858585',
+                  }}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
+        {/* Danger Zone */}
+        <Section label="Danger Zone">
+          <button
+            onClick={handleResetApplication}
+            disabled={isResetting || !backendConnected}
+            style={{
+              width: '100%', padding: '6px 0',
+              background: isResetting || !backendConnected ? 'transparent' : 'rgba(244,71,71,0.08)',
+              border: '1px solid rgba(244,71,71,0.35)',
+              borderRadius: 4, color: '#F44747', fontSize: 10,
+              cursor: isResetting || !backendConnected ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--font-mono)', opacity: isResetting || !backendConnected ? 0.5 : 1,
+            }}
+          >
+            {isResetting ? 'Resetting…' : 'Reset Application'}
+          </button>
+        </Section>
+      </div>
+
+      {/* Save button pinned at bottom */}
+      <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        {saveStatus === 'error' && (
+          <p style={{
+            fontSize: 10, color: '#F44747',
+            fontFamily: 'var(--font-mono)', marginBottom: 6,
+          }}>
+            ✗ {saveError || 'Save failed'}
+          </p>
+        )}
+        {saveStatus === 'success' && (
+          <p style={{
+            fontSize: 10, color: '#4EC9B0',
+            fontFamily: 'var(--font-mono)', marginBottom: 6,
+          }}>
+            ✓ Settings saved
+          </p>
+        )}
+        <button
+          onClick={onSaveSettings}
+          disabled={saveStatus === 'saving' || !userId || !backendConnected}
+          style={{
+            width: '100%', padding: '8px 0',
+            background: saveStatus === 'saving' || !userId || !backendConnected
+              ? 'rgba(78,201,176,0.3)' : '#4EC9B0',
+            border: 'none', borderRadius: 4,
+            color: '#1E1E1E', fontSize: 11, fontWeight: 600,
+            cursor: saveStatus === 'saving' || !userId || !backendConnected ? 'not-allowed' : 'pointer',
+            fontFamily: 'var(--font-mono)', letterSpacing: '0.05em',
+          }}
+        >
+          {saveStatus === 'saving' ? 'Saving…' : 'Save Settings'}
+        </button>
+        {(!userId || !backendConnected) && (
+          <p style={{
+            fontSize: 9, color: '#DCDCAA',
+            fontFamily: 'var(--font-mono)', marginTop: 4, textAlign: 'center',
+          }}>
+            ⚠️ {!backendConnected ? 'backend offline' : 'no user id'}
+          </p>
+        )}
       </div>
     </div>
   );

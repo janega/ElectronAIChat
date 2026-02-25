@@ -1,116 +1,176 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Message } from '../types';
-import { RefreshCw, AlertCircle, FileText, Brain } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
-  isDark: boolean;
+  isDark?: boolean;
   onRetry?: (message: Message) => void;
 }
 
-export function MessageBubble({ message, isDark, onRetry }: MessageBubbleProps) {
-  const isUser = message.role === 'user';
-  const hasError = message.error || (message.content.startsWith('Error:') && message.role === 'assistant');
+// Simple markdown renderer for bold (**text**) and inline code (`code`)
+function renderContent(content: string, isStreaming: boolean) {
+  const parts = content.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return (
+            <strong key={i} style={{ color: '#E8E8E8', fontWeight: 600 }}>
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return (
+            <code
+              key={i}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                color: '#CE9178',
+                background: 'rgba(206,145,120,0.1)',
+                padding: '1px 5px', borderRadius: 3,
+              }}
+            >
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+      {isStreaming && (
+        <span
+          className="animate-blink"
+          style={{
+            display: 'inline-block', width: 2, height: 14,
+            background: '#4EC9B0', marginLeft: 2, verticalAlign: 'text-bottom',
+          }}
+        />
+      )}
+    </>
+  );
+}
 
-  // Debug logging for sources
-  useEffect(() => {
-    if (message.role === 'assistant') {
-      console.log('[MessageBubble] Rendering message:', {
-        id: message.id,
-        hasSources: !!message.sources,
-        sourcesLength: message.sources?.length,
-        sources: message.sources,
-      });
-    }
-  }, [message]);
+export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
+  const isUser = message.role === 'user';
+  const isStreaming = !!(message as any).streaming;
+
+  // Format timestamp
+  const timestamp = message.timestamp
+    ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div
+      style={{
+        padding: '16px 24px', display: 'flex', gap: 14,
+        background: isUser ? 'transparent' : 'rgba(255,255,255,0.018)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}
+    >
+      {/* Avatar */}
       <div
-        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-          isUser
-            ? 'bg-blue-600 text-white rounded-br-none'
-            : hasError
-            ? 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100 border border-red-300 dark:border-red-700 rounded-bl-none'
-            : `${isDark ? 'bg-gray-800' : 'bg-gray-200'} text-gray-900 dark:text-gray-100 rounded-bl-none`
-        }`}
+        style={{
+          width: 26, height: 26, borderRadius: 4, flexShrink: 0, marginTop: 1,
+          background: isUser ? '#3C3C3C' : 'linear-gradient(135deg,#4EC9B0,#569CD6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)',
+          color: isUser ? '#858585' : '#1E1E1E',
+        }}
       >
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {message.content}
-        </p>
-        
-        {/* Document Sources Attribution */}
-        {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
-          <div className={`mt-2 pt-2 border-t ${isDark ? 'border-gray-700' : 'border-gray-300'}`}>
-            <p className="text-xs font-medium opacity-70 mb-1">Sources:</p>
-            <div className="flex flex-wrap gap-1">
-              {message.sources.map((source, idx) => {
-                const isMemory = source.type === 'memory';
-                const Icon = isMemory ? Brain : FileText;
-                const tooltipText = isMemory 
-                  ? 'Retrieved from long-term memory' 
-                  : `Document: ${source.filename}`;
-                
-                return (
-                  <span
-                    key={idx}
-                    className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
-                      isDark 
-                        ? 'bg-gray-700 text-gray-300' 
-                        : 'bg-gray-300 text-gray-700'
-                    }`}
-                    title={tooltipText}
-                  >
-                    <Icon size={12} />
-                    <span>{source.filename}</span>
-                  </span>
-                );
-              })}
-            </div>
+        {isUser ? 'U' : 'AI'}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Role + timestamp + streaming badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{
+            fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600,
+            letterSpacing: '0.03em', color: isUser ? '#CCCCCC' : '#4EC9B0',
+          }}>
+            {isUser ? 'user' : 'assistant'}
+          </span>
+          {timestamp && (
+            <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+              {timestamp}
+            </span>
+          )}
+          {isStreaming && (
+            <span style={{
+              fontSize: 10, color: '#DCDCAA', fontFamily: 'var(--font-mono)',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              <span
+                className="animate-pulse-dot"
+                style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: '#DCDCAA', display: 'inline-block',
+                }}
+              />
+              streaming
+            </span>
+          )}
+        </div>
+
+        {/* Message body */}
+        <div style={{
+          fontSize: 13, color: '#D4D4D4', lineHeight: 1.75,
+          fontFamily: 'var(--font-sans)', wordBreak: 'break-word',
+        }}>
+          {message.content ? renderContent(message.content, isStreaming) : (
+            isStreaming ? (
+              <span
+                className="animate-blink"
+                style={{
+                  display: 'inline-block', width: 2, height: 14,
+                  background: '#4EC9B0', verticalAlign: 'text-bottom',
+                }}
+              />
+            ) : null
+          )}
+        </div>
+
+        {/* Source citations */}
+        {message.sources && message.sources.length > 0 && (
+          <div style={{ marginTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+              sources:
+            </span>
+            {message.sources.map((src, idx) => (
+              <span
+                key={idx}
+                title={src.type === 'memory' ? 'Retrieved from long-term memory' : `Document: ${src.filename}`}
+                style={{
+                  fontSize: 10, color: '#569CD6',
+                  fontFamily: 'var(--font-mono)',
+                  background: 'rgba(86,156,214,0.08)',
+                  border: '1px solid rgba(86,156,214,0.2)',
+                  borderRadius: 3, padding: '2px 7px', cursor: 'default',
+                }}
+              >
+                {src.filename}
+              </span>
+            ))}
           </div>
         )}
-        
-        {message.role === 'user' && onRetry && (
-          <div className="mt-2 pt-2 border-t border-blue-400 dark:border-blue-500 flex items-center gap-2">
+
+        {/* Retry button for user messages */}
+        {isUser && onRetry && (
+          <div style={{ marginTop: 6 }}>
             <button
               onClick={() => onRetry(message)}
-              disabled={message.isRetrying}
-              className="flex items-center gap-1 text-xs font-medium text-blue-100 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={(message as any).isRetrying}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: 10, color: '#858585', fontFamily: 'var(--font-mono)',
+                display: 'flex', alignItems: 'center', gap: 4, padding: 0,
+                opacity: (message as any).isRetrying ? 0.5 : 1,
+              }}
               title="Retry sending this message"
             >
-              <RefreshCw size={12} className={message.isRetrying ? 'animate-spin' : ''} />
-              {message.isRetrying ? 'Retrying...' : 'Retry'}
+              ↺ {(message as any).isRetrying ? 'Retrying…' : 'Retry'}
             </button>
           </div>
-        )}
-        
-        {/* Metadata for assistant messages */}
-        {message.role === 'assistant' && (message.modelUsed || message.tokensUsed || message.responseTime) && (
-          <div className={`mt-2 pt-2 border-t ${isDark ? 'border-gray-700' : 'border-gray-300'}`}>
-            <div className="flex flex-wrap gap-2 text-xs opacity-70">
-              {message.modelUsed && (
-                <span title="Model used">
-                  🤖 {message.modelUsed}
-                </span>
-              )}
-              {message.tokensUsed && (
-                <span title="Tokens used">
-                  🔢 {message.tokensUsed} tokens
-                </span>
-              )}
-              {message.responseTime && (
-                <span title="Response time">
-                  ⏱️ {message.responseTime.toFixed(2)}s
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {message.searchMode && (
-          <p className="text-xs mt-1 opacity-70">
-            Search: {message.searchMode}
-          </p>
         )}
       </div>
     </div>
