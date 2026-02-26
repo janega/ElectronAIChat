@@ -21,7 +21,9 @@ function MarkdownContent({ text }: { text: string }) {
         // Code: inline vs fenced block
         code({ className, children, ...props }) {
           const match = /language-(\w+)/.exec(className ?? '');
-          const lang = match ? match[1] : '';
+          // Sanitise: allow only alphanumeric + hyphens to prevent unexpected values.
+          const rawLang = match ? match[1] : '';
+          const lang = /^[a-zA-Z0-9-]+$/.test(rawLang) ? rawLang : '';
           const isBlock = !!className;
           if (isBlock) {
             return (
@@ -278,6 +280,8 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
                 gap: 5,
               }}
               title={showThinking ? 'Hide thinking' : 'Show thinking'}
+              aria-label={showThinking ? 'Hide thinking section' : 'Show thinking section'}
+              aria-expanded={showThinking}
             >
               <span style={{ fontSize: 10 }}>{showThinking ? '▾' : '▸'}</span>
               {showThinking ? 'Hide thinking' : 'Show thinking'}
@@ -307,6 +311,11 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
                     >
                       {block.tag}{block.isOpen ? ' (streaming…)' : ''}
                     </span>
+                    {block.isOpen && (
+                      <span aria-live="polite" className="sr-only">
+                        {block.tag} section is still streaming
+                      </span>
+                    )}
                     <div
                       style={{
                         fontSize: 13,
