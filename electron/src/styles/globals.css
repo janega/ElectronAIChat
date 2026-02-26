@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Light theme (default) */
+/* Light theme base — app defaults to dark via .dark class applied in index.html */
 :root {
   --c-bg: #F3F3F3;
   --c-surface: #FFFFFF;
@@ -87,12 +87,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3C3C3C;
+  background: var(--c-input);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4C4C4C;
+  background: var(--c-text-faint);
 }
 
 /* Focus styles */

@@ -56,7 +56,7 @@ export function MessageInput({
     }}>
       <div style={{
         display: 'flex', gap: 8, background: 'var(--c-input)',
-        borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 6, border: '1px solid var(--c-border)',
         padding: '10px 12px', alignItems: 'flex-end',
       }}>
         <textarea

@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Local LLM Chat with RAG</title>
+    <script>
+      // Apply saved theme before first render to prevent flash
+      try {
+        var saved = localStorage.getItem('app:theme');
+        var isDark = saved !== null ? JSON.parse(saved) : true;
+        if (isDark) document.documentElement.classList.add('dark');
+      } catch(e) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

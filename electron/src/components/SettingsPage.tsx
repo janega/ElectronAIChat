@@ -50,7 +50,7 @@ function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (v: b
       onClick={() => onChange(!enabled)}
       style={{
         width: 34, height: 18, borderRadius: 9, cursor: 'pointer',
-        background: enabled ? '#4EC9B0' : 'var(--c-input)',
+        background: enabled ? 'var(--c-teal)' : 'var(--c-input)',
         position: 'relative', transition: 'background 0.2s', flexShrink: 0,
       }}
     >
@@ -290,8 +290,8 @@ export function SettingsPage({
                     flex: 1, padding: '5px 0', fontFamily: 'var(--font-mono)',
                     fontSize: 11, cursor: 'pointer', borderRadius: 3,
                     background: isActive ? 'rgba(78,201,176,0.12)' : 'transparent',
-                    border: isActive ? '1px solid #4EC9B0' : '1px solid var(--c-input)',
-                    color: isActive ? '#4EC9B0' : 'var(--c-text-lo)',
+                    border: isActive ? '1px solid var(--c-teal)' : '1px solid var(--c-input)',
+                    color: isActive ? 'var(--c-teal)' : 'var(--c-text-lo)',
                   }}
                 >
                   {t}
