@@ -3,8 +3,35 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* VS Code dark theme color palette */
+/* Light theme base — app defaults to dark via .dark class applied in index.html */
 :root {
+  --c-bg: #F3F3F3;
+  --c-surface: #FFFFFF;
+  --c-raised: #EBEBEB;
+  --c-border: #CCCCCC;
+  --c-divider: rgba(0,0,0,0.08);
+  --c-input: #E5E5E5;
+  --c-teal: #007C74;
+  --c-blue: #0070C1;
+  --c-yellow: #795E26;
+  --c-orange: #A31515;
+  --c-red: #CD3131;
+  --c-text-hi: #1E1E1E;
+  --c-text-mid: #333333;
+  --c-text-lo: #616161;
+  --c-text-faint: #AAAAAA;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-sans: 'Segoe UI', system-ui, sans-serif;
+  --bg-primary: #F3F3F3;
+  --bg-secondary: #FFFFFF;
+  --text-primary: #1E1E1E;
+  --text-secondary: #333333;
+  --border: #CCCCCC;
+  --accent: #007C74;
+}
+
+/* Dark theme override */
+.dark {
   --c-bg: #1E1E1E;
   --c-surface: #252526;
   --c-raised: #2D2D2D;
@@ -20,10 +47,6 @@
   --c-text-mid: #CCCCCC;
   --c-text-lo: #858585;
   --c-text-faint: #555555;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-  --font-sans: 'Segoe UI', system-ui, sans-serif;
-
-  /* Legacy theme variables kept for compatibility */
   --bg-primary: #1E1E1E;
   --bg-secondary: #252526;
   --text-primary: #E8E8E8;
@@ -45,6 +68,7 @@ body {
   background-color: var(--c-bg);
   color: var(--c-text-hi);
   overflow: hidden;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 #root {
@@ -63,12 +87,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3C3C3C;
+  background: var(--c-input);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4C4C4C;
+  background: var(--c-text-faint);
 }
 
 /* Focus styles */

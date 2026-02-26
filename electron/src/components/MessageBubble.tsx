@@ -15,7 +15,7 @@ function renderContent(content: string, isStreaming: boolean) {
       {parts.map((part, i) => {
         if (part.startsWith('**') && part.endsWith('**')) {
           return (
-            <strong key={i} style={{ color: '#E8E8E8', fontWeight: 600 }}>
+            <strong key={i} style={{ color: 'var(--c-text-hi)', fontWeight: 600 }}>
               {part.slice(2, -2)}
             </strong>
           );
@@ -25,8 +25,8 @@ function renderContent(content: string, isStreaming: boolean) {
             <code
               key={i}
               style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11,
-                color: '#CE9178',
+                fontFamily: 'var(--font-mono)', fontSize: 12,
+                color: 'var(--c-orange)',
                 background: 'rgba(206,145,120,0.1)',
                 padding: '1px 5px', borderRadius: 3,
               }}
@@ -42,7 +42,7 @@ function renderContent(content: string, isStreaming: boolean) {
           className="animate-blink"
           style={{
             display: 'inline-block', width: 2, height: 14,
-            background: '#4EC9B0', marginLeft: 2, verticalAlign: 'text-bottom',
+            background: 'var(--c-teal)', marginLeft: 2, verticalAlign: 'text-bottom',
           }}
         />
       )}
@@ -64,17 +64,17 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
       style={{
         padding: '16px 24px', display: 'flex', gap: 14,
         background: isUser ? 'transparent' : 'rgba(255,255,255,0.018)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid var(--c-divider)',
       }}
     >
       {/* Avatar */}
       <div
         style={{
           width: 26, height: 26, borderRadius: 4, flexShrink: 0, marginTop: 1,
-          background: isUser ? '#3C3C3C' : 'linear-gradient(135deg,#4EC9B0,#569CD6)',
+          background: isUser ? 'var(--c-input)' : 'linear-gradient(135deg,#4EC9B0,#569CD6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)',
-          color: isUser ? '#858585' : '#1E1E1E',
+          fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)',
+          color: isUser ? 'var(--c-text-lo)' : 'var(--c-bg)',
         }}
       >
         {isUser ? 'U' : 'AI'}
@@ -85,26 +85,26 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
         {/* Role + timestamp + streaming badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <span style={{
-            fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600,
-            letterSpacing: '0.03em', color: isUser ? '#CCCCCC' : '#4EC9B0',
+            fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600,
+            letterSpacing: '0.03em', color: isUser ? 'var(--c-text-mid)' : 'var(--c-teal)',
           }}>
             {isUser ? 'user' : 'assistant'}
           </span>
           {timestamp && (
-            <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>
               {timestamp}
             </span>
           )}
           {isStreaming && (
             <span style={{
-              fontSize: 10, color: '#DCDCAA', fontFamily: 'var(--font-mono)',
+              fontSize: 11, color: 'var(--c-yellow)', fontFamily: 'var(--font-mono)',
               display: 'flex', alignItems: 'center', gap: 4,
             }}>
               <span
                 className="animate-pulse-dot"
                 style={{
                   width: 6, height: 6, borderRadius: '50%',
-                  background: '#DCDCAA', display: 'inline-block',
+                  background: 'var(--c-yellow)', display: 'inline-block',
                 }}
               />
               streaming
@@ -114,7 +114,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
 
         {/* Message body */}
         <div style={{
-          fontSize: 13, color: '#D4D4D4', lineHeight: 1.75,
+          fontSize: 14, color: 'var(--c-text-mid)', lineHeight: 1.75,
           fontFamily: 'var(--font-sans)', wordBreak: 'break-word',
         }}>
           {message.content ? renderContent(message.content, isStreaming) : (
@@ -123,7 +123,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
                 className="animate-blink"
                 style={{
                   display: 'inline-block', width: 2, height: 14,
-                  background: '#4EC9B0', verticalAlign: 'text-bottom',
+                  background: 'var(--c-teal)', verticalAlign: 'text-bottom',
                 }}
               />
             ) : null
@@ -133,7 +133,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
         {/* Source citations */}
         {message.sources && message.sources.length > 0 && (
           <div style={{ marginTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>
               sources:
             </span>
             {message.sources.map((src, idx) => (
@@ -141,7 +141,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
                 key={idx}
                 title={src.type === 'memory' ? 'Retrieved from long-term memory' : `Document: ${src.filename}`}
                 style={{
-                  fontSize: 10, color: '#569CD6',
+                  fontSize: 11, color: 'var(--c-blue)',
                   fontFamily: 'var(--font-mono)',
                   background: 'rgba(86,156,214,0.08)',
                   border: '1px solid rgba(86,156,214,0.2)',
@@ -162,7 +162,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
               disabled={(message as any).isRetrying}
               style={{
                 background: 'transparent', border: 'none', cursor: 'pointer',
-                fontSize: 10, color: '#858585', fontFamily: 'var(--font-mono)',
+                fontSize: 11, color: 'var(--c-text-lo)', fontFamily: 'var(--font-mono)',
                 display: 'flex', alignItems: 'center', gap: 4, padding: 0,
                 opacity: (message as any).isRetrying ? 0.5 : 1,
               }}
