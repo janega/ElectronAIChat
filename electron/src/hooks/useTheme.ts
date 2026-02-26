@@ -4,7 +4,7 @@ import { STORAGE_KEYS } from '../utils/constants';
 export function useTheme() {
   const [isDark, setIsDark] = useState<boolean>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.THEME);
-    return saved ? JSON.parse(saved) : false; // Default to light theme
+    return saved ? JSON.parse(saved) : true; // Default to dark theme
   });
 
   useEffect(() => {

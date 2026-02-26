@@ -17,13 +17,13 @@ export function ChatWindow({
   onRetryMessage,
 }: ChatWindowProps) {
   return (
-    <div style={{ flex: 1, overflowY: 'auto', background: '#1E1E1E' }}>
+    <div style={{ flex: 1, overflowY: 'auto', background: 'var(--c-bg)' }}>
       {messages.length === 0 ? (
         <div style={{
           height: '100%', display: 'flex',
           alignItems: 'center', justifyContent: 'center',
         }}>
-          <p style={{ fontSize: 13, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+          <p style={{ fontSize: 14, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>
             No messages yet. Start chatting!
           </p>
         </div>
@@ -40,13 +40,13 @@ export function ChatWindow({
             <div style={{
               padding: '16px 24px', display: 'flex', gap: 14,
               background: 'rgba(255,255,255,0.018)',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              borderBottom: '1px solid var(--c-divider)',
             }}>
               <div style={{
                 width: 26, height: 26, borderRadius: 4, flexShrink: 0,
                 background: 'linear-gradient(135deg,#4EC9B0,#569CD6)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#1E1E1E',
+                fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--c-bg)',
               }}>
                 AI
               </div>
@@ -57,7 +57,7 @@ export function ChatWindow({
                     className="animate-bounce"
                     style={{
                       width: 6, height: 6, borderRadius: '50%',
-                      background: '#4EC9B0', animationDelay: `${delay}s`,
+                      background: 'var(--c-teal)', animationDelay: `${delay}s`,
                     }}
                   />
                 ))}

@@ -582,7 +582,7 @@ function AppContent() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', background: '#1E1E1E', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', background: 'var(--c-bg)', overflow: 'hidden', transition: 'background-color 0.2s, color 0.2s' }}>
       {/* Left Sidebar */}
       <Sidebar
         chats={chats}
@@ -600,13 +600,13 @@ function AppContent() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Top bar */}
         <div style={{
-          height: 42, background: '#2D2D2D',
-          borderBottom: '1px solid #1A1A1A',
+          height: 42, background: 'var(--c-raised)',
+          borderBottom: '1px solid var(--c-border)',
           display: 'flex', alignItems: 'center',
           padding: '0 16px', gap: 10, flexShrink: 0,
         }}>
           <span style={{
-            fontSize: 12, color: '#CCCCCC',
+            fontSize: 13, color: 'var(--c-text-mid)',
             fontFamily: 'var(--font-mono)', flex: 1,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
@@ -616,15 +616,15 @@ function AppContent() {
           {backendWarnings.length > 0 && showWarnings && (
             <span
               title={backendWarnings.map((w: any) => `[${w.component}] ${w.message}`).join('\n')}
-              style={{ fontSize: 10, color: '#DCDCAA', fontFamily: 'var(--font-mono)', cursor: 'default' }}
+              style={{ fontSize: 11, color: 'var(--c-yellow)', fontFamily: 'var(--font-mono)', cursor: 'default' }}
             >
               ⚠ {backendWarnings.length}
             </span>
           )}
           {/* Search mode badge */}
           <span style={{
-            fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
-            color: '#4EC9B0', background: 'rgba(78,201,176,0.1)',
+            fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
+            color: 'var(--c-teal)', background: 'rgba(78,201,176,0.1)',
             border: '1px solid rgba(78,201,176,0.25)', borderRadius: 3, padding: '1px 6px',
           }}>
             {searchModeLabel[searchMode] || 'LLM'}
@@ -632,8 +632,8 @@ function AppContent() {
           {/* Model badge */}
           {modelsData?.current_model && (
             <span style={{
-              fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
-              color: '#569CD6', background: 'rgba(86,156,214,0.1)',
+              fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
+              color: 'var(--c-blue)', background: 'rgba(86,156,214,0.1)',
               border: '1px solid rgba(86,156,214,0.25)', borderRadius: 3, padding: '1px 6px',
               maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
@@ -670,15 +670,15 @@ function AppContent() {
                 width: 48, height: 48, borderRadius: 10, margin: '0 auto 16px',
                 background: 'linear-gradient(135deg,#4EC9B0,#569CD6)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 20, color: '#1E1E1E', fontWeight: 700,
+                fontSize: 21, color: 'var(--c-bg)', fontWeight: 700,
                 fontFamily: 'var(--font-mono)',
               }}>
                 AI
               </div>
-              <p style={{ fontSize: 18, color: '#CCCCCC', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>
+              <p style={{ fontSize: 19, color: 'var(--c-text-mid)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>
                 Welcome to ElectronAIChat
               </p>
-              <p style={{ fontSize: 12, color: '#555555', fontFamily: 'var(--font-mono)', marginBottom: 24 }}>
+              <p style={{ fontSize: 13, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)', marginBottom: 24 }}>
                 Select a chat or start a new conversation
               </p>
               <button
@@ -687,7 +687,7 @@ function AppContent() {
                 style={{
                   padding: '8px 20px', background: 'transparent',
                   border: '1px solid rgba(78,201,176,0.4)',
-                  borderRadius: 4, color: '#4EC9B0', fontSize: 12,
+                  borderRadius: 4, color: 'var(--c-teal)', fontSize: 13,
                   cursor: isCreatingChat ? 'not-allowed' : 'pointer',
                   fontFamily: 'var(--font-mono)', opacity: isCreatingChat ? 0.6 : 1,
                   display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto',
@@ -699,7 +699,7 @@ function AppContent() {
                     Creating…
                   </>
                 ) : (
-                  <><span style={{ fontSize: 16 }}>+</span> New Chat</>
+                  <><span style={{ fontSize: 17 }}>+</span> New Chat</>
                 )}
               </button>
             </div>
@@ -756,14 +756,14 @@ function AppContent() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
         }}>
           <div style={{
-            background: '#2D2D2D', borderRadius: 8, padding: '32px 40px',
+            background: 'var(--c-raised)', borderRadius: 8, padding: '32px 40px',
             textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)',
           }}>
-            <svg style={{ width: 40, height: 40, color: '#4EC9B0', margin: '0 auto 16px' }} className="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg style={{ width: 40, height: 40, color: 'var(--c-teal)', margin: '0 auto 16px' }} className="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p style={{ color: '#CCCCCC', fontSize: 14, fontFamily: 'var(--font-mono)' }}>
+            <p style={{ color: 'var(--c-text-mid)', fontSize: 15, fontFamily: 'var(--font-mono)' }}>
               Syncing your chats…
             </p>
           </div>

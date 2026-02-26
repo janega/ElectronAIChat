@@ -10,9 +10,9 @@ interface DocsPanelProps {
 }
 
 function statusDotColor(status: string): string {
-  if (status === 'ready') return '#4EC9B0';
-  if (status === 'error') return '#F44747';
-  return '#DCDCAA'; // uploading/processing states
+  if (status === 'ready') return 'var(--c-teal)';
+  if (status === 'error') return 'var(--c-red)';
+  return 'var(--c-yellow)'; // uploading/processing states
 }
 
 function humanSize(bytes: number): string {
@@ -41,18 +41,18 @@ export function DocsPanel({ uploadedDocs, searchMode, onSearchModeChange, onUplo
 
   return (
     <div style={{
-      width: 260, background: '#252526',
-      borderLeft: '1px solid #1A1A1A',
+      width: 260, background: 'var(--c-surface)',
+      borderLeft: '1px solid var(--c-border)',
       display: 'flex', flexDirection: 'column', flexShrink: 0,
     }}>
       {/* Header */}
       <div style={{
-        height: 42, borderBottom: '1px solid #1A1A1A',
+        height: 42, borderBottom: '1px solid var(--c-border)',
         display: 'flex', alignItems: 'center', gap: 7, padding: '0 14px', flexShrink: 0,
       }}>
-        <span style={{ color: '#858585' }}><DocIcon /></span>
+        <span style={{ color: 'var(--c-text-lo)' }}><DocIcon /></span>
         <span style={{
-          fontSize: 11, color: '#CCCCCC', fontWeight: 600,
+          fontSize: 12, color: 'var(--c-text-mid)', fontWeight: 600,
           letterSpacing: '0.06em', textTransform: 'uppercase',
           fontFamily: 'var(--font-mono)',
         }}>
@@ -63,7 +63,7 @@ export function DocsPanel({ uploadedDocs, searchMode, onSearchModeChange, onUplo
       {/* Search mode switcher */}
       <div style={{ padding: '10px 14px 8px' }}>
         <div style={{
-          fontSize: 10, color: '#555555',
+          fontSize: 11, color: 'var(--c-text-faint)',
           fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', marginBottom: 6,
         }}>
           SEARCH MODE
@@ -77,11 +77,11 @@ export function DocsPanel({ uploadedDocs, searchMode, onSearchModeChange, onUplo
                 onClick={() => onSearchModeChange(value)}
                 style={{
                   flex: 1, padding: '5px 0',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer',
                   borderRadius: 3, letterSpacing: '0.05em',
                   background: isActive ? 'rgba(78,201,176,0.12)' : 'transparent',
-                  border: isActive ? '1px solid #4EC9B0' : '1px solid #3C3C3C',
-                  color: isActive ? '#4EC9B0' : '#858585',
+                  border: isActive ? '1px solid var(--c-teal)' : '1px solid var(--c-input)',
+                  color: isActive ? 'var(--c-teal)' : 'var(--c-text-lo)',
                   transition: 'all 0.15s',
                 }}
               >
@@ -92,13 +92,13 @@ export function DocsPanel({ uploadedDocs, searchMode, onSearchModeChange, onUplo
         </div>
       </div>
 
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+      <div style={{ height: 1, background: 'var(--c-divider)' }} />
 
       {/* Document list */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {uploadedDocs.length === 0 ? (
           <p style={{
-            fontSize: 11, color: '#555555', textAlign: 'center',
+            fontSize: 12, color: 'var(--c-text-faint)', textAlign: 'center',
             padding: '16px 14px', fontFamily: 'var(--font-mono)',
           }}>
             No documents uploaded
@@ -112,7 +112,7 @@ export function DocsPanel({ uploadedDocs, searchMode, onSearchModeChange, onUplo
                 key={doc.id}
                 style={{
                   padding: '9px 14px',
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  borderBottom: '1px solid var(--c-divider)',
                   cursor: 'default',
                 }}
               >
@@ -122,7 +122,7 @@ export function DocsPanel({ uploadedDocs, searchMode, onSearchModeChange, onUplo
                     background: dot, flexShrink: 0, display: 'inline-block',
                   }} />
                   <span style={{
-                    fontSize: 11, color: '#CCCCCC',
+                    fontSize: 12, color: 'var(--c-text-mid)',
                     fontFamily: 'var(--font-mono)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
@@ -130,12 +130,12 @@ export function DocsPanel({ uploadedDocs, searchMode, onSearchModeChange, onUplo
                   </span>
                 </div>
                 <div style={{
-                  fontSize: 10, color: '#555555',
+                  fontSize: 11, color: 'var(--c-text-faint)',
                   fontFamily: 'var(--font-mono)', paddingLeft: 13, display: 'flex', gap: 10,
                 }}>
                   <span>{humanSize(doc.size)}</span>
                   {isProcessing ? (
-                    <span style={{ color: '#DCDCAA' }}>
+                    <span style={{ color: 'var(--c-yellow)' }}>
                       {doc.progress !== undefined ? `${Math.round(doc.progress)}%` : 'processing…'}
                     </span>
                   ) : doc.chunks !== undefined ? (
@@ -169,9 +169,9 @@ export function DocsPanel({ uploadedDocs, searchMode, onSearchModeChange, onUplo
           onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(78,201,176,0.35)')}
           onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)')}
         >
-          <div style={{ fontSize: 18, color: '#555555', marginBottom: 4 }}>↑</div>
-          <div style={{ fontSize: 10, color: '#555555' }}>Drop files or click to upload</div>
-          <div style={{ fontSize: 10, color: '#555555', marginTop: 2, opacity: 0.6 }}>
+          <div style={{ fontSize: 19, color: 'var(--c-text-faint)', marginBottom: 4 }}>↑</div>
+          <div style={{ fontSize: 11, color: 'var(--c-text-faint)' }}>Drop files or click to upload</div>
+          <div style={{ fontSize: 11, color: 'var(--c-text-faint)', marginTop: 2, opacity: 0.6 }}>
             PDF · TXT · MD · DOCX · JSON · PY
           </div>
         </div>

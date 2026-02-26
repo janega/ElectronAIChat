@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 
 const TAG_COLORS: Record<string, { color: string; bg: string; border: string }> = {
-  preference: { color: '#4EC9B0', bg: 'rgba(78,201,176,0.1)', border: 'rgba(78,201,176,0.2)' },
-  context:    { color: '#569CD6', bg: 'rgba(86,156,214,0.1)', border: 'rgba(86,156,214,0.2)' },
-  skill:      { color: '#DCDCAA', bg: 'rgba(220,220,170,0.1)', border: 'rgba(220,220,170,0.2)' },
-  config:     { color: '#CE9178', bg: 'rgba(206,145,120,0.1)', border: 'rgba(206,145,120,0.2)' },
+  preference: { color: 'var(--c-teal)', bg: 'rgba(78,201,176,0.1)', border: 'rgba(78,201,176,0.2)' },
+  context:    { color: 'var(--c-blue)', bg: 'rgba(86,156,214,0.1)', border: 'rgba(86,156,214,0.2)' },
+  skill:      { color: 'var(--c-yellow)', bg: 'rgba(220,220,170,0.1)', border: 'rgba(220,220,170,0.2)' },
+  config:     { color: 'var(--c-orange)', bg: 'rgba(206,145,120,0.1)', border: 'rgba(206,145,120,0.2)' },
 };
 
 interface MemoryEntry {
@@ -47,9 +47,9 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
   const dedupedCount = uniqueTexts.size;
 
   const stats = [
-    { label: 'facts', value: String(factCount), color: '#4EC9B0' },
-    { label: 'sessions', value: String(sessionCount), color: '#569CD6' },
-    { label: 'deduped', value: String(dedupedCount), color: '#DCDCAA' },
+    { label: 'facts', value: String(factCount), color: 'var(--c-teal)' },
+    { label: 'sessions', value: String(sessionCount), color: 'var(--c-blue)' },
+    { label: 'deduped', value: String(dedupedCount), color: 'var(--c-yellow)' },
   ];
 
   function inferTag(entry: MemoryEntry): string {
@@ -62,18 +62,18 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
 
   return (
     <div style={{
-      width: 260, background: '#252526',
-      borderLeft: '1px solid #1A1A1A',
+      width: 260, background: 'var(--c-surface)',
+      borderLeft: '1px solid var(--c-border)',
       display: 'flex', flexDirection: 'column', flexShrink: 0,
     }}>
       {/* Header */}
       <div style={{
-        height: 42, borderBottom: '1px solid #1A1A1A',
+        height: 42, borderBottom: '1px solid var(--c-border)',
         display: 'flex', alignItems: 'center', gap: 7, padding: '0 14px', flexShrink: 0,
       }}>
-        <span style={{ color: '#858585' }}><BrainIcon /></span>
+        <span style={{ color: 'var(--c-text-lo)' }}><BrainIcon /></span>
         <span style={{
-          fontSize: 11, color: '#CCCCCC', fontWeight: 600,
+          fontSize: 12, color: 'var(--c-text-mid)', fontWeight: 600,
           letterSpacing: '0.06em', textTransform: 'uppercase',
           fontFamily: 'var(--font-mono)',
         }}>
@@ -82,19 +82,19 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--c-divider)' }}>
         {stats.map((s, i) => (
           <div
             key={s.label}
             style={{
               flex: 1, padding: '10px 0', textAlign: 'center',
-              borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              borderRight: i < stats.length - 1 ? '1px solid var(--c-divider)' : 'none',
             }}
           >
-            <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: s.color }}>
+            <div style={{ fontSize: 17, fontFamily: 'var(--font-mono)', fontWeight: 600, color: s.color }}>
               {s.value}
             </div>
-            <div style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+            <div style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
               {s.label}
             </div>
           </div>
@@ -105,11 +105,11 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
       <div style={{ padding: '8px 12px' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          background: '#3C3C3C', borderRadius: 4, padding: '5px 9px',
+          background: 'var(--c-input)', borderRadius: 4, padding: '5px 9px',
         }}>
           <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
-            <circle cx="6.5" cy="6.5" r="5.5" stroke="#858585" strokeWidth="1.5"/>
-            <path d="M11 11L15 15" stroke="#858585" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="6.5" cy="6.5" r="5.5" stroke="var(--c-text-lo)" strokeWidth="1.5"/>
+            <path d="M11 11L15 15" stroke="var(--c-text-lo)" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
           <input
             value={search}
@@ -117,7 +117,7 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
             placeholder="Search memories…"
             style={{
               background: 'transparent', border: 'none', outline: 'none',
-              color: '#CCCCCC', fontSize: 11, fontFamily: 'var(--font-mono)', width: '100%',
+              color: 'var(--c-text-mid)', fontSize: 12, fontFamily: 'var(--font-mono)', width: '100%',
             }}
           />
         </div>
@@ -127,7 +127,7 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {filtered.length === 0 ? (
           <p style={{
-            fontSize: 11, color: '#555555', textAlign: 'center',
+            fontSize: 12, color: 'var(--c-text-faint)', textAlign: 'center',
             padding: '16px 14px', fontFamily: 'var(--font-mono)',
           }}>
             {memories.length === 0 ? 'No memories stored yet' : 'No results'}
@@ -143,26 +143,26 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
                 key={m.id || idx}
                 style={{
                   padding: '9px 14px',
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  borderBottom: '1px solid var(--c-divider)',
                   display: 'flex', flexDirection: 'column', gap: 5,
                 }}
               >
                 <div style={{
-                  fontSize: 11, color: '#CCCCCC', lineHeight: 1.55,
+                  fontSize: 12, color: 'var(--c-text-mid)', lineHeight: 1.55,
                   fontFamily: 'var(--font-sans)',
                 }}>
                   {text}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{
-                    fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
+                    fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
                     color: tc.color, background: tc.bg,
                     border: `1px solid ${tc.border}`, borderRadius: 3, padding: '1px 6px',
                   }}>
                     {tag}
                   </span>
                   {ts && (
-                    <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>
                       {ts}
                     </span>
                   )}
@@ -176,13 +176,13 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
       {/* Footer actions */}
       <div style={{
         padding: '10px 12px',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
+        borderTop: '1px solid var(--c-divider)',
         display: 'flex', gap: 6,
       }}>
         <button style={{
           flex: 1, padding: '6px 0', background: 'transparent',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 4, color: '#858585', fontSize: 10, cursor: 'pointer',
+          border: '1px solid var(--c-divider)',
+          borderRadius: 4, color: 'var(--c-text-lo)', fontSize: 11, cursor: 'pointer',
           fontFamily: 'var(--font-mono)',
         }}>
           Clear All
@@ -190,7 +190,7 @@ export function MemoryPanel({ memories = [] }: MemoryPanelProps) {
         <button style={{
           flex: 1, padding: '6px 0', background: 'transparent',
           border: '1px solid rgba(78,201,176,0.3)',
-          borderRadius: 4, color: '#4EC9B0', fontSize: 10, cursor: 'pointer',
+          borderRadius: 4, color: 'var(--c-teal)', fontSize: 11, cursor: 'pointer',
           fontFamily: 'var(--font-mono)',
         }}>
           Export

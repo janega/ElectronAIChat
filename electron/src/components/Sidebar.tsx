@@ -82,7 +82,7 @@ function DeleteModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#2D2D2D',
+          background: 'var(--c-raised)',
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: 8,
           padding: '24px 28px',
@@ -90,19 +90,19 @@ function DeleteModal({
           boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
         }}
       >
-        <div style={{ fontSize: 13, color: '#E8E8E8', fontWeight: 600, marginBottom: 8, fontFamily: 'var(--font-sans)' }}>
+        <div style={{ fontSize: 14, color: 'var(--c-text-hi)', fontWeight: 600, marginBottom: 8, fontFamily: 'var(--font-sans)' }}>
           Delete chat?
         </div>
-        <div style={{ fontSize: 12, color: '#858585', lineHeight: 1.6, marginBottom: 20, fontFamily: 'var(--font-sans)' }}>
-          "<span style={{ color: '#CCCCCC' }}>{title}</span>" will be permanently deleted including all messages and embeddings.
+        <div style={{ fontSize: 13, color: 'var(--c-text-lo)', lineHeight: 1.6, marginBottom: 20, fontFamily: 'var(--font-sans)' }}>
+          "<span style={{ color: 'var(--c-text-mid)' }}>{title}</span>" will be permanently deleted including all messages and embeddings.
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button
             onClick={onCancel}
             style={{
               padding: '6px 16px', background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: 4, color: '#CCCCCC', fontSize: 11, cursor: 'pointer',
+              border: '1px solid var(--c-divider)',
+              borderRadius: 4, color: 'var(--c-text-mid)', fontSize: 12, cursor: 'pointer',
               fontFamily: 'var(--font-mono)',
             }}
           >
@@ -114,7 +114,7 @@ function DeleteModal({
               padding: '6px 16px',
               background: 'rgba(244,71,71,0.15)',
               border: '1px solid rgba(244,71,71,0.45)',
-              borderRadius: 4, color: '#F44747', fontSize: 11, cursor: 'pointer',
+              borderRadius: 4, color: 'var(--c-red)', fontSize: 12, cursor: 'pointer',
               fontFamily: 'var(--font-mono)', fontWeight: 600,
             }}
           >
@@ -217,8 +217,8 @@ export function Sidebar({
   if (collapsed) {
     return (
       <div style={{
-        width: 48, background: '#252526',
-        borderRight: '1px solid #1A1A1A',
+        width: 48, background: 'var(--c-surface)',
+        borderRight: '1px solid var(--c-border)',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', padding: '10px 0', gap: 4, flexShrink: 0,
       }}>
@@ -229,7 +229,7 @@ export function Sidebar({
             width: 26, height: 26, borderRadius: 5,
             background: 'linear-gradient(135deg,#4EC9B0,#569CD6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, color: '#1E1E1E', fontWeight: 700,
+            fontSize: 11, color: 'var(--c-bg)', fontWeight: 700,
             fontFamily: 'var(--font-mono)', cursor: 'pointer', marginBottom: 6,
           }}
         >
@@ -238,7 +238,7 @@ export function Sidebar({
         <button
           onClick={() => setCollapsed(false)}
           title="Expand sidebar"
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#858585' }}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-text-lo)' }}
         >
           <ChevR size={14} />
         </button>
@@ -249,7 +249,7 @@ export function Sidebar({
           style={{
             width: 28, height: 28, background: 'transparent',
             border: '1px solid rgba(78,201,176,0.35)',
-            borderRadius: 4, color: '#4EC9B0', fontSize: 16, cursor: 'pointer',
+            borderRadius: 4, color: 'var(--c-teal)', fontSize: 17, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             marginTop: 4, marginBottom: 8,
           }}
@@ -265,7 +265,7 @@ export function Sidebar({
             style={{
               background: 'transparent', border: 'none', cursor: 'pointer',
               padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center',
-              color: rightPanel === id ? '#4EC9B0' : '#858585',
+              color: rightPanel === id ? 'var(--c-teal)' : 'var(--c-text-lo)',
               transition: 'color 0.15s',
             }}
           >
@@ -287,26 +287,26 @@ export function Sidebar({
         />
       )}
       <div style={{
-        width: 232, background: '#252526',
-        borderRight: '1px solid #1A1A1A',
+        width: 232, background: 'var(--c-surface)',
+        borderRight: '1px solid var(--c-border)',
         display: 'flex', flexDirection: 'column', flexShrink: 0,
         fontFamily: 'var(--font-mono)',
       }}>
         {/* Header */}
         <div style={{
           padding: '10px 12px 10px 14px',
-          borderBottom: '1px solid #1A1A1A',
+          borderBottom: '1px solid var(--c-border)',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <div style={{
             width: 22, height: 22, borderRadius: 4,
             background: 'linear-gradient(135deg,#4EC9B0,#569CD6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, color: '#1E1E1E', fontWeight: 700, flexShrink: 0,
+            fontSize: 12, color: 'var(--c-bg)', fontWeight: 700, flexShrink: 0,
           }}>
             AI
           </div>
-          <span style={{ fontSize: 12, color: '#CCCCCC', fontWeight: 600, letterSpacing: '0.06em', flex: 1 }}>
+          <span style={{ fontSize: 13, color: 'var(--c-text-mid)', fontWeight: 600, letterSpacing: '0.06em', flex: 1 }}>
             ElectronAIChat
           </span>
           <button
@@ -314,7 +314,7 @@ export function Sidebar({
             title="Collapse sidebar"
             style={{
               background: 'transparent', border: 'none', cursor: 'pointer',
-              color: '#555555', padding: 2, borderRadius: 3, display: 'flex', alignItems: 'center',
+              color: 'var(--c-text-faint)', padding: 2, borderRadius: 3, display: 'flex', alignItems: 'center',
             }}
           >
             <ChevL size={14} />
@@ -325,11 +325,11 @@ export function Sidebar({
         <div style={{ padding: '8px 10px 4px' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            background: '#3C3C3C', borderRadius: 4, padding: '5px 9px',
+            background: 'var(--c-input)', borderRadius: 4, padding: '5px 9px',
           }}>
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
-              <circle cx="6.5" cy="6.5" r="5.5" stroke="#858585" strokeWidth="1.5"/>
-              <path d="M11 11L15 15" stroke="#858585" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="6.5" cy="6.5" r="5.5" stroke="var(--c-text-lo)" strokeWidth="1.5"/>
+              <path d="M11 11L15 15" stroke="var(--c-text-lo)" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
             <input
               value={search}
@@ -337,7 +337,7 @@ export function Sidebar({
               placeholder="Search chats…"
               style={{
                 background: 'transparent', border: 'none', outline: 'none',
-                color: '#CCCCCC', fontSize: 11, fontFamily: 'var(--font-mono)', width: '100%',
+                color: 'var(--c-text-mid)', fontSize: 12, fontFamily: 'var(--font-mono)', width: '100%',
               }}
             />
           </div>
@@ -351,19 +351,19 @@ export function Sidebar({
             style={{
               width: '100%', padding: '6px 10px', background: 'transparent',
               border: '1px solid rgba(78,201,176,0.3)',
-              borderRadius: 4, color: '#4EC9B0', fontSize: 11, cursor: 'pointer',
+              borderRadius: 4, color: 'var(--c-teal)', fontSize: 12, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               fontFamily: 'var(--font-mono)', opacity: isCreatingChat ? 0.6 : 1,
             }}
           >
-            <span style={{ fontSize: 14, lineHeight: 1 }}>+</span>
+            <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
             {isCreatingChat ? 'Creating…' : 'New Chat'}
           </button>
         </div>
 
         {/* Section label */}
         <div style={{
-          fontSize: 10, color: '#555555', letterSpacing: '0.1em',
+          fontSize: 11, color: 'var(--c-text-faint)', letterSpacing: '0.1em',
           textTransform: 'uppercase', padding: '6px 14px 3px',
         }}>
           Recent
@@ -372,7 +372,7 @@ export function Sidebar({
         {/* Chat list */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {filteredChats.length === 0 ? (
-            <p style={{ fontSize: 11, color: '#555555', textAlign: 'center', padding: '16px 0', fontFamily: 'var(--font-mono)' }}>
+            <p style={{ fontSize: 12, color: 'var(--c-text-faint)', textAlign: 'center', padding: '16px 0', fontFamily: 'var(--font-mono)' }}>
               No chats yet
             </p>
           ) : (
@@ -389,7 +389,7 @@ export function Sidebar({
                   style={{
                     padding: '7px 8px 7px 12px', cursor: isRen ? 'default' : 'pointer',
                     background: isActive ? 'rgba(78,201,176,0.07)' : isHov ? 'rgba(255,255,255,0.03)' : 'transparent',
-                    borderLeft: isActive ? '2px solid #4EC9B0' : '2px solid transparent',
+                    borderLeft: isActive ? '2px solid var(--c-teal)' : '2px solid transparent',
                     display: 'flex', alignItems: 'center', gap: 4,
                     transition: 'background 0.1s',
                   }}
@@ -406,21 +406,21 @@ export function Sidebar({
                         }}
                         onClick={(e) => e.stopPropagation()}
                         style={{
-                          width: '100%', background: '#3C3C3C',
-                          border: '1px solid #4EC9B0', borderRadius: 3,
-                          padding: '2px 6px', color: '#E8E8E8', fontSize: 11,
+                          width: '100%', background: 'var(--c-input)',
+                          border: '1px solid var(--c-teal)', borderRadius: 3,
+                          padding: '2px 6px', color: 'var(--c-text-hi)', fontSize: 12,
                           fontFamily: 'var(--font-mono)', outline: 'none',
                         }}
                       />
                     ) : (
                       <>
                         <div style={{
-                          fontSize: 11, color: isActive ? '#E8E8E8' : '#AAAAAA',
+                          fontSize: 12, color: isActive ? 'var(--c-text-hi)' : 'var(--c-text-faint)',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}>
                           {chat.title || 'Untitled'}
                         </div>
-                        <div style={{ fontSize: 10, color: '#555555', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: 'var(--c-text-faint)', marginTop: 2 }}>
                           {getRelativeTime(chat.updatedAt || chat.createdAt)}
                         </div>
                       </>
@@ -436,14 +436,14 @@ export function Sidebar({
                         <button
                           title="Save"
                           onClick={(e) => { e.stopPropagation(); commitRename(); }}
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#4EC9B0', display: 'flex', alignItems: 'center' }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-teal)', display: 'flex', alignItems: 'center' }}
                         >
                           <CheckIcon />
                         </button>
                         <button
                           title="Cancel"
                           onClick={(e) => { e.stopPropagation(); setRenamingId(null); }}
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#858585', display: 'flex', alignItems: 'center' }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-text-lo)', display: 'flex', alignItems: 'center' }}
                         >
                           <XIcon />
                         </button>
@@ -453,18 +453,18 @@ export function Sidebar({
                         <button
                           title="Rename"
                           onClick={(e) => { e.stopPropagation(); startRename(chat); }}
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#858585', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#CCCCCC')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#858585')}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-text-lo)', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--c-text-mid)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--c-text-lo)')}
                         >
                           <PencilIcon />
                         </button>
                         <button
                           title="Delete"
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(chat); }}
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#858585', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#F44747')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#858585')}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-text-lo)', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--c-red)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--c-text-lo)')}
                         >
                           <TrashIcon />
                         </button>
@@ -479,7 +479,7 @@ export function Sidebar({
 
         {/* Bottom nav */}
         <div style={{
-          borderTop: '1px solid #1A1A1A', padding: '8px 10px',
+          borderTop: '1px solid var(--c-border)', padding: '8px 10px',
           display: 'flex', justifyContent: 'space-around',
         }}>
           {navItems.map(({ id, Icon, label }) => (
@@ -490,11 +490,11 @@ export function Sidebar({
               style={{
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center',
-                color: rightPanel === id ? '#4EC9B0' : '#858585',
+                color: rightPanel === id ? 'var(--c-teal)' : 'var(--c-text-lo)',
                 transition: 'color 0.15s',
               }}
-              onMouseEnter={(e) => { if (rightPanel !== id) (e.currentTarget as HTMLButtonElement).style.color = '#CCCCCC'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = rightPanel === id ? '#4EC9B0' : '#858585'; }}
+              onMouseEnter={(e) => { if (rightPanel !== id) (e.currentTarget as HTMLButtonElement).style.color = 'var(--c-text-mid)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = rightPanel === id ? 'var(--c-teal)' : 'var(--c-text-lo)'; }}
             >
               <Icon size={16} />
             </button>

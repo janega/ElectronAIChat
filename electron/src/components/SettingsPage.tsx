@@ -30,9 +30,9 @@ const GearIcon = () => (
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ borderBottom: '1px solid var(--c-divider)' }}>
       <div style={{
-        fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)',
+        fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)',
         letterSpacing: '0.1em', textTransform: 'uppercase', padding: '10px 14px 6px',
       }}>
         {label}
@@ -50,14 +50,14 @@ function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (v: b
       onClick={() => onChange(!enabled)}
       style={{
         width: 34, height: 18, borderRadius: 9, cursor: 'pointer',
-        background: enabled ? '#4EC9B0' : '#3C3C3C',
+        background: enabled ? '#4EC9B0' : 'var(--c-input)',
         position: 'relative', transition: 'background 0.2s', flexShrink: 0,
       }}
     >
       <div style={{
         position: 'absolute', top: 2, left: enabled ? 18 : 2,
         width: 14, height: 14, borderRadius: '50%',
-        background: enabled ? '#1E1E1E' : '#858585',
+        background: enabled ? 'var(--c-bg)' : 'var(--c-text-lo)',
         transition: 'left 0.2s',
       }} />
     </div>
@@ -108,18 +108,18 @@ export function SettingsPage({
 
   return (
     <div style={{
-      width: 260, background: '#252526',
-      borderLeft: '1px solid #1A1A1A',
+      width: 260, background: 'var(--c-surface)',
+      borderLeft: '1px solid var(--c-border)',
       display: 'flex', flexDirection: 'column', flexShrink: 0,
     }}>
       {/* Header */}
       <div style={{
-        height: 42, borderBottom: '1px solid #1A1A1A',
+        height: 42, borderBottom: '1px solid var(--c-border)',
         display: 'flex', alignItems: 'center', gap: 7, padding: '0 14px', flexShrink: 0,
       }}>
-        <span style={{ color: '#858585' }}><GearIcon /></span>
+        <span style={{ color: 'var(--c-text-lo)' }}><GearIcon /></span>
         <span style={{
-          fontSize: 11, color: '#CCCCCC', fontWeight: 600,
+          fontSize: 12, color: 'var(--c-text-mid)', fontWeight: 600,
           letterSpacing: '0.06em', textTransform: 'uppercase',
           fontFamily: 'var(--font-mono)',
         }}>
@@ -129,10 +129,10 @@ export function SettingsPage({
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{
             width: 7, height: 7, borderRadius: '50%',
-            background: backendConnected ? '#4EC9B0' : '#F44747',
+            background: backendConnected ? 'var(--c-teal)' : 'var(--c-red)',
             display: 'inline-block', flexShrink: 0,
           }} />
-          <span style={{ fontSize: 9, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: 10, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>
             {backendConnected ? 'online' : 'offline'}
           </span>
         </div>
@@ -151,10 +151,10 @@ export function SettingsPage({
                   onClick={() => onModelSwitch && onModelSwitch(p)}
                   style={{
                     flex: 1, padding: '5px 0', fontFamily: 'var(--font-mono)',
-                    fontSize: 10, cursor: 'pointer', borderRadius: 3,
+                    fontSize: 11, cursor: 'pointer', borderRadius: 3,
                     background: isActive ? 'rgba(86,156,214,0.12)' : 'transparent',
-                    border: isActive ? '1px solid #569CD6' : '1px solid #3C3C3C',
-                    color: isActive ? '#569CD6' : '#858585',
+                    border: isActive ? '1px solid var(--c-blue)' : '1px solid var(--c-input)',
+                    color: isActive ? 'var(--c-blue)' : 'var(--c-text-lo)',
                   }}
                 >
                   {p}
@@ -164,30 +164,30 @@ export function SettingsPage({
           </div>
           {provider === 'ollama' && (
             <div>
-              <div style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>Host</div>
+              <div style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>Host</div>
               <input
                 defaultValue={settings.ollamaHost || 'http://localhost:11434'}
                 style={{
-                  width: '100%', background: '#3C3C3C',
+                  width: '100%', background: 'var(--c-input)',
                   border: '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: 4, padding: '6px 9px', color: '#CCCCCC',
-                  fontSize: 11, fontFamily: 'var(--font-mono)', outline: 'none',
+                  borderRadius: 4, padding: '6px 9px', color: 'var(--c-text-mid)',
+                  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none',
                 }}
               />
             </div>
           )}
           {/* Model selector */}
           <div>
-            <div style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>Model</div>
+            <div style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>Model</div>
             {models.length > 1 ? (
               <select
                 value={currentModel}
                 onChange={(e) => onModelSwitch && onModelSwitch(provider, e.target.value)}
                 style={{
-                  width: '100%', background: '#3C3C3C',
+                  width: '100%', background: 'var(--c-input)',
                   border: '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: 4, padding: '6px 9px', color: '#CCCCCC',
-                  fontSize: 11, fontFamily: 'var(--font-mono)', outline: 'none',
+                  borderRadius: 4, padding: '6px 9px', color: 'var(--c-text-mid)',
+                  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none',
                   cursor: 'pointer',
                 }}
               >
@@ -197,10 +197,10 @@ export function SettingsPage({
               <input
                 defaultValue={currentModel}
                 style={{
-                  width: '100%', background: '#3C3C3C',
+                  width: '100%', background: 'var(--c-input)',
                   border: '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: 4, padding: '6px 9px', color: '#CCCCCC',
-                  fontSize: 11, fontFamily: 'var(--font-mono)', outline: 'none',
+                  borderRadius: 4, padding: '6px 9px', color: 'var(--c-text-mid)',
+                  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none',
                 }}
               />
             )}
@@ -212,40 +212,40 @@ export function SettingsPage({
           {/* Temperature */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-              <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>Temperature</span>
-              <span style={{ fontSize: 10, color: '#4EC9B0', fontFamily: 'var(--font-mono)' }}>{settings.temperature.toFixed(2)}</span>
+              <span style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>Temperature</span>
+              <span style={{ fontSize: 11, color: 'var(--c-teal)', fontFamily: 'var(--font-mono)' }}>{settings.temperature.toFixed(2)}</span>
             </div>
             <input
               type="range" min={0} max={2} step={0.05}
               value={settings.temperature}
               onChange={(e) => onSettingChange('temperature', parseFloat(e.target.value))}
-              style={{ width: '100%', accentColor: '#4EC9B0', cursor: 'pointer' }}
+              style={{ width: '100%', accentColor: 'var(--c-teal)', cursor: 'pointer' }}
             />
           </div>
           {/* Max Tokens */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-              <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>Max Tokens</span>
-              <span style={{ fontSize: 10, color: '#569CD6', fontFamily: 'var(--font-mono)' }}>{settings.maxTokens}</span>
+              <span style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>Max Tokens</span>
+              <span style={{ fontSize: 11, color: 'var(--c-blue)', fontFamily: 'var(--font-mono)' }}>{settings.maxTokens}</span>
             </div>
             <input
               type="range" min={256} max={8192} step={256}
               value={settings.maxTokens}
               onChange={(e) => onSettingChange('maxTokens', parseInt(e.target.value))}
-              style={{ width: '100%', accentColor: '#569CD6', cursor: 'pointer' }}
+              style={{ width: '100%', accentColor: 'var(--c-blue)', cursor: 'pointer' }}
             />
           </div>
           {/* Top P */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-              <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>Top P</span>
-              <span style={{ fontSize: 10, color: '#DCDCAA', fontFamily: 'var(--font-mono)' }}>{settings.topP.toFixed(2)}</span>
+              <span style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>Top P</span>
+              <span style={{ fontSize: 11, color: 'var(--c-yellow)', fontFamily: 'var(--font-mono)' }}>{settings.topP.toFixed(2)}</span>
             </div>
             <input
               type="range" min={0} max={1} step={0.05}
               value={settings.topP}
               onChange={(e) => onSettingChange('topP', parseFloat(e.target.value))}
-              style={{ width: '100%', accentColor: '#DCDCAA', cursor: 'pointer' }}
+              style={{ width: '100%', accentColor: 'var(--c-yellow)', cursor: 'pointer' }}
             />
           </div>
         </Section>
@@ -258,10 +258,10 @@ export function SettingsPage({
             rows={4}
             placeholder="You are a helpful AI assistant…"
             style={{
-              width: '100%', background: '#3C3C3C',
+              width: '100%', background: 'var(--c-input)',
               border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 4, padding: '8px 10px', color: '#D4D4D4',
-              fontSize: 11, fontFamily: 'var(--font-sans)',
+              borderRadius: 4, padding: '8px 10px', color: 'var(--c-text-mid)',
+              fontSize: 12, fontFamily: 'var(--font-sans)',
               resize: 'vertical', lineHeight: 1.6, outline: 'none',
             }}
           />
@@ -270,7 +270,7 @@ export function SettingsPage({
         {/* Features */}
         <Section label="Features">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: '#CCCCCC', fontFamily: 'var(--font-sans)' }}>
+            <span style={{ fontSize: 12, color: 'var(--c-text-mid)', fontFamily: 'var(--font-sans)' }}>
               Long-term Memory (Mem0)
             </span>
             <ToggleSwitch enabled={useMemory} onChange={(v) => onUseMemoryChange && onUseMemoryChange(v)} />
@@ -288,10 +288,10 @@ export function SettingsPage({
                   onClick={() => onThemeChange && onThemeChange(t === 'dark')}
                   style={{
                     flex: 1, padding: '5px 0', fontFamily: 'var(--font-mono)',
-                    fontSize: 10, cursor: 'pointer', borderRadius: 3,
+                    fontSize: 11, cursor: 'pointer', borderRadius: 3,
                     background: isActive ? 'rgba(78,201,176,0.12)' : 'transparent',
-                    border: isActive ? '1px solid #4EC9B0' : '1px solid #3C3C3C',
-                    color: isActive ? '#4EC9B0' : '#858585',
+                    border: isActive ? '1px solid #4EC9B0' : '1px solid var(--c-input)',
+                    color: isActive ? '#4EC9B0' : 'var(--c-text-lo)',
                   }}
                 >
                   {t}
@@ -310,7 +310,7 @@ export function SettingsPage({
               width: '100%', padding: '6px 0',
               background: isResetting || !backendConnected ? 'transparent' : 'rgba(244,71,71,0.08)',
               border: '1px solid rgba(244,71,71,0.35)',
-              borderRadius: 4, color: '#F44747', fontSize: 10,
+              borderRadius: 4, color: 'var(--c-red)', fontSize: 11,
               cursor: isResetting || !backendConnected ? 'not-allowed' : 'pointer',
               fontFamily: 'var(--font-mono)', opacity: isResetting || !backendConnected ? 0.5 : 1,
             }}
@@ -321,10 +321,10 @@ export function SettingsPage({
       </div>
 
       {/* Save button pinned at bottom */}
-      <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ padding: '10px 14px', borderTop: '1px solid var(--c-divider)' }}>
         {saveStatus === 'error' && (
           <p style={{
-            fontSize: 10, color: '#F44747',
+            fontSize: 11, color: 'var(--c-red)',
             fontFamily: 'var(--font-mono)', marginBottom: 6,
           }}>
             ✗ {saveError || 'Save failed'}
@@ -332,7 +332,7 @@ export function SettingsPage({
         )}
         {saveStatus === 'success' && (
           <p style={{
-            fontSize: 10, color: '#4EC9B0',
+            fontSize: 11, color: 'var(--c-teal)',
             fontFamily: 'var(--font-mono)', marginBottom: 6,
           }}>
             ✓ Settings saved
@@ -344,9 +344,9 @@ export function SettingsPage({
           style={{
             width: '100%', padding: '8px 0',
             background: saveStatus === 'saving' || !userId || !backendConnected
-              ? 'rgba(78,201,176,0.3)' : '#4EC9B0',
+              ? 'rgba(78,201,176,0.3)' : 'var(--c-teal)',
             border: 'none', borderRadius: 4,
-            color: '#1E1E1E', fontSize: 11, fontWeight: 600,
+            color: 'var(--c-bg)', fontSize: 12, fontWeight: 600,
             cursor: saveStatus === 'saving' || !userId || !backendConnected ? 'not-allowed' : 'pointer',
             fontFamily: 'var(--font-mono)', letterSpacing: '0.05em',
           }}
@@ -355,7 +355,7 @@ export function SettingsPage({
         </button>
         {(!userId || !backendConnected) && (
           <p style={{
-            fontSize: 9, color: '#DCDCAA',
+            fontSize: 10, color: 'var(--c-yellow)',
             fontFamily: 'var(--font-mono)', marginTop: 4, textAlign: 'center',
           }}>
             ⚠️ {!backendConnected ? 'backend offline' : 'no user id'}

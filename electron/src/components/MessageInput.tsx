@@ -49,13 +49,13 @@ export function MessageInput({
 
   return (
     <div style={{
-      background: '#252526',
-      borderTop: '1px solid #1A1A1A',
+      background: 'var(--c-surface)',
+      borderTop: '1px solid var(--c-border)',
       padding: '12px 16px',
       flexShrink: 0,
     }}>
       <div style={{
-        display: 'flex', gap: 8, background: '#3C3C3C',
+        display: 'flex', gap: 8, background: 'var(--c-input)',
         borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
         padding: '10px 12px', alignItems: 'flex-end',
       }}>
@@ -69,7 +69,7 @@ export function MessageInput({
           rows={1}
           style={{
             flex: 1, background: 'transparent', border: 'none', outline: 'none',
-            color: '#D4D4D4', fontSize: 13, fontFamily: 'var(--font-sans)',
+            color: 'var(--c-text-mid)', fontSize: 14, fontFamily: 'var(--font-sans)',
             resize: 'none', lineHeight: 1.6, minHeight: 21, maxHeight: 200,
             overflowY: 'auto',
           }}
@@ -79,10 +79,10 @@ export function MessageInput({
             onClick={onStop}
             title="Stop generation"
             style={{
-              background: '#F44747', border: 'none', borderRadius: 4,
+              background: 'var(--c-red)', border: 'none', borderRadius: 4,
               width: 30, height: 30, display: 'flex', alignItems: 'center',
               justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
-              color: '#1E1E1E',
+              color: 'var(--c-bg)',
             }}
           >
             <StopIcon />
@@ -93,13 +93,13 @@ export function MessageInput({
             disabled={!input.trim()}
             title="Send message"
             style={{
-              background: input.trim() ? '#4EC9B0' : '#3C3C3C',
+              background: input.trim() ? 'var(--c-teal)' : 'var(--c-input)',
               border: 'none', borderRadius: 4,
               width: 30, height: 30, display: 'flex', alignItems: 'center',
               justifyContent: 'center',
               cursor: input.trim() ? 'pointer' : 'default',
               flexShrink: 0,
-              color: input.trim() ? '#1E1E1E' : '#555555',
+              color: input.trim() ? 'var(--c-bg)' : 'var(--c-text-faint)',
               transition: 'background 0.15s, color 0.15s',
             }}
           >
@@ -111,11 +111,11 @@ export function MessageInput({
         display: 'flex', justifyContent: 'space-between',
         marginTop: 7, paddingLeft: 2,
       }}>
-        <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+        <span style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>
           ⏎ send · ⇧⏎ newline
         </span>
         {(temperature !== undefined || maxTokens !== undefined) && (
-          <span style={{ fontSize: 10, color: '#555555', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)' }}>
             {temperature !== undefined && `temp: ${temperature}`}
             {temperature !== undefined && maxTokens !== undefined && ' · '}
             {maxTokens !== undefined && `max_tokens: ${maxTokens}`}
