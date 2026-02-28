@@ -120,6 +120,10 @@ select:focus {
   50% { opacity: 0.5; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .animate-blink {
   animation: blink 1s step-end infinite;
 }

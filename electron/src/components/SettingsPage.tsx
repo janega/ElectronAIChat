@@ -85,6 +85,17 @@ export function SettingsPage({
   const currentModel = modelsData?.current_model ?? settings.model;
   const models = modelsData?.models ?? [];
   const [isResetting, setIsResetting] = useState(false);
+  const [isSwitchingProvider, setIsSwitchingProvider] = useState(false);
+
+  const handleProviderSwitch = async (p: string) => {
+    if (!onModelSwitch || isSwitchingProvider) return;
+    setIsSwitchingProvider(true);
+    try {
+      await onModelSwitch(p);
+    } finally {
+      setIsSwitchingProvider(false);
+    }
+  };
 
   const handleResetApplication = async () => {
     const firstConfirm = window.confirm(
@@ -141,20 +152,41 @@ export function SettingsPage({
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {/* LLM Provider */}
-        <Section label="LLM Provider">
+        <div style={{ borderBottom: '1px solid var(--c-divider)' }}>
+          <div style={{
+            fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.1em', textTransform: 'uppercase', padding: '10px 14px 6px',
+            display: 'flex', alignItems: 'center', gap: 7,
+          }}>
+            LLM Provider
+            {isSwitchingProvider && (
+              <svg
+                width="11" height="11" viewBox="0 0 24 24"
+                fill="none" stroke="var(--c-teal)" strokeWidth="2.5"
+                strokeLinecap="round"
+                style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}
+              >
+                <path d="M12 2a10 10 0 0 1 10 10" />
+              </svg>
+            )}
+          </div>
+          <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {PROVIDER_OPTIONS.map((p) => {
               const isActive = provider === p;
               return (
                 <button
                   key={p}
-                  onClick={() => onModelSwitch && onModelSwitch(p)}
+                  onClick={() => handleProviderSwitch(p)}
+                  disabled={isSwitchingProvider}
                   style={{
                     flex: 1, padding: '5px 0', fontFamily: 'var(--font-mono)',
-                    fontSize: 11, cursor: 'pointer', borderRadius: 3,
+                    fontSize: 11, cursor: isSwitchingProvider ? 'not-allowed' : 'pointer', borderRadius: 3,
                     background: isActive ? 'rgba(86,156,214,0.12)' : 'transparent',
                     border: isActive ? '1px solid var(--c-blue)' : '1px solid var(--c-input)',
                     color: isActive ? 'var(--c-blue)' : 'var(--c-text-lo)',
+                    opacity: isSwitchingProvider && !isActive ? 0.5 : 1,
+                    transition: 'opacity 0.2s',
                   }}
                 >
                   {p}
@@ -177,7 +209,7 @@ export function SettingsPage({
             </div>
           )}
           {/* Model selector */}
-          <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div>
             <div style={{ fontSize: 11, color: 'var(--c-text-faint)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>Model</div>
             {models.length > 1 ? (
               <select
@@ -205,7 +237,9 @@ export function SettingsPage({
               />
             )}
           </div>
-        </Section>
+          </div>
+          </div>
+        </div>
 
         {/* Generation */}
         <Section label="Generation">
