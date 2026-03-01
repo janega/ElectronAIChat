@@ -11,9 +11,12 @@
     "build:electron": "tsc -p ./tsconfig.json",
     "build": "npm run build:react && npm run build:electron",
     "prepackage": "node ./scripts/prePackage.js",
-    "package": "electron-builder"
+    "package": "electron-builder",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.1.16",
     "@types/node": "^24.7.0",
     "@types/react": "^19.2.2",

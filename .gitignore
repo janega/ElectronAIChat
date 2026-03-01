@@ -111,6 +111,11 @@ htmlcov/
 # Vite
 .vite/
 
+# Playwright
+/electron/playwright-report/
+/electron/test-results/
+/electron/.playwright-browsers/
+
 # Jupyter Notebooks
 *.ipynb_checkpoints/
 
