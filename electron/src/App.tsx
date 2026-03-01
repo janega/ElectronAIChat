@@ -721,7 +721,7 @@ function AppContent() {
         />
       )}
       {rightPanel === 'memory' && (
-        <MemoryPanel />
+        <MemoryPanel userId={userId} />
       )}
       {rightPanel === 'settings' && (
         <SettingsPage

@@ -34,6 +34,7 @@ from app.routes.users import router as users_router
 from app.routes.admin import router as admin_router
 from app.routes.llamacpp_api import router as llamacpp_api_router
 from app.routes.models import router as models_router
+from app.routes.memories import router as memories_router
 
 # Use the logger from config
 logger = cfg_logger
@@ -327,6 +328,7 @@ app.include_router(chats_router)
 app.include_router(users_router)
 app.include_router(admin_router)
 app.include_router(models_router)
+app.include_router(memories_router)
 
 # Register internal llamacpp API (for Mem0 custom provider)
 app.include_router(llamacpp_api_router)
