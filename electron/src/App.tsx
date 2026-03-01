@@ -579,6 +579,7 @@ function AppContent() {
   // ── Chat panel top bar label for search mode ──
   const searchModeLabel: Record<string, string> = {
     normal: 'LLM', embeddings: 'RAG', all: 'ALL',
+    manual_search: 'WEB', agentic_search: 'AGENT',
   };
 
   return (
@@ -658,6 +659,11 @@ function AppContent() {
               isLoading={isLoading}
               temperature={settings.temperature}
               maxTokens={settings.maxTokens}
+              searchMode={searchMode}
+              onSearchModeChange={(mode) => {
+                setSearchMode(mode);
+                if (currentChatId) updateChat(currentChatId, { searchMode: mode as any });
+              }}
             />
           </>
         ) : (
