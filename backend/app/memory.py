@@ -43,7 +43,16 @@ class MemoryStub:
         return {"results": results}  # v1.1 format wrapper
 
     async def get_all(self, user_id: str):
-        return self._store.get(user_id, [])
+        items = self._store.get(user_id, [])
+        results = []
+        for item in items:
+            memory_text = " | ".join([m.get("content", "") for m in item.get("messages", [])])
+            results.append({
+                "id": item.get("id"),
+                "memory": memory_text,
+                "metadata": item.get("metadata", {})
+            })
+        return {"results": results}
 
     async def update(self, memory_id: str, data: Dict[str, Any]):
         # naive update: scan and update
@@ -57,9 +66,15 @@ class MemoryStub:
     async def delete(self, memory_id: str):
         for uid, items in list(self._store.items()):
             new_items = [i for i in items if i.get("id") != memory_id]
-            self._store[uid] = new_items
-            return True
+            if len(new_items) < len(items):
+                self._store[uid] = new_items
+                return True
         return False
+
+    async def delete_all(self, user_id: str):
+        count = len(self._store.get(user_id, []))
+        self._store[user_id] = []
+        return count
 
     async def add_conversation_pair(self, user_id: str, user_message: str, assistant_message: str, metadata: Optional[dict] = None):
         """MemoryStub implementation of add_conversation_pair for fallback consistency"""
@@ -423,6 +438,35 @@ class Mem0MemoryManager:
         except Exception:
             logger.exception("Failed to delete memory")
             return False
+
+    async def delete_all(self, user_id: str):
+        """Delete all memories for a user.
+        
+        Uses native delete_all if available (Mem0 v1.1+), otherwise falls back
+        to fetching and deleting memories one-by-one.
+        """
+        await self._ensure_initialized()
+        try:
+            # Use native delete_all if available (Mem0 v1.1+)
+            if hasattr(self.memory, 'delete_all'):
+                result = await self.memory.delete_all(user_id=user_id)
+                return result
+            # Fallback: fetch all and delete one by one
+            result = await self.get_all(user_id=user_id)
+            if isinstance(result, dict):
+                memories = result.get("results", [])
+            else:
+                memories = result or []
+            deleted = 0
+            for mem in memories:
+                mem_id = mem.get("id") if isinstance(mem, dict) else None
+                if mem_id:
+                    await self.memory.delete(memory_id=mem_id)
+                    deleted += 1
+            return deleted
+        except Exception:
+            logger.exception("Failed to delete all memories")
+            return 0
 
     async def get_user_context(self, user_id: str) -> str:
         memories = await self.get_all(user_id)

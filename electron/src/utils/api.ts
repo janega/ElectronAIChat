@@ -1,6 +1,15 @@
 import { Document, StreamChunk } from '../types';
 import { API_BASE_URL } from './constants';
 
+export interface MemoryEntry {
+  id: string | number;
+  memory?: string;
+  text?: string;
+  ts?: string;
+  tag?: string;
+  metadata?: Record<string, any>;
+}
+
 export interface ModelInfo {
   name: string;
   provider: string;
@@ -359,8 +368,30 @@ export class ApiClient {
     return response.json();
   }
 
-  async generateChatTitle(chatId: string): Promise<{ success: boolean; title?: string; status?: string }> {
-    const url = `${this.baseUrl}/api/chats/${chatId}/generate-title`;
+  async getMemories(userId: string): Promise<{ memories: MemoryEntry[] }> {
+    return this.request(`/api/memories/${encodeURIComponent(userId)}`);
+  }
+
+  async updateMemory(memoryId: string, memory: string): Promise<{ success: boolean; memory_id: string }> {
+    return this.request(`/api/memories/${encodeURIComponent(memoryId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ memory }),
+    });
+  }
+
+  async deleteMemory(memoryId: string): Promise<{ success: boolean; memory_id: string }> {
+    return this.request(`/api/memories/${encodeURIComponent(memoryId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async clearAllMemories(userId: string): Promise<{ success: boolean; deleted: number }> {
+    return this.request(`/api/memories/${encodeURIComponent(userId)}/all`, {
+      method: 'DELETE',
+    });
+  }
+
+  async generateChatTitle(chatId: string): Promise<{ success: boolean; title?: string; status?: string }> {    const url = `${this.baseUrl}/api/chats/${chatId}/generate-title`;
     try {
       const response = await fetch(url, { method: 'POST' });
 
