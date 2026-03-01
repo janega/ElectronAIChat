@@ -1,149 +1,506 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { Chat } from '../types';
 
+// ── Icons ──────────────────────────────────────────────────────────────────
+const DocIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+  </svg>
+);
+const BrainIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5C12 3.34 10.66 2 9 2a3 3 0 0 0-3 3c0 .35.06.69.17 1A3 3 0 0 0 4 9a3 3 0 0 0 1.17 2.37A3 3 0 0 0 6 14a3 3 0 0 0 3 3h1"/>
+    <path d="M12 5c0-1.66 1.34-3 3-3a3 3 0 0 1 3 3c0 .35-.06.69-.17 1A3 3 0 0 1 20 9a3 3 0 0 1-1.17 2.37A3 3 0 0 1 18 14a3 3 0 0 1-3 3h-1"/>
+    <path d="M9 17v1a3 3 0 0 0 6 0v-1"/>
+    <line x1="12" y1="5" x2="12" y2="17"/>
+  </svg>
+);
+const GearIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+const ChevL = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+);
+const ChevR = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+);
+const PencilIcon = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const TrashIcon = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    <path d="M10 11v6M14 11v6"/>
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  </svg>
+);
+const CheckIcon = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+const XIcon = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+    <line x1="18" y1="6" x2="6" y2="18"/>
+    <line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+
+// ── Delete Modal ───────────────────────────────────────────────────────────
+function DeleteModal({
+  title,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--c-raised)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 8,
+          padding: '24px 28px',
+          width: 320,
+          boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+        }}
+      >
+        <div style={{ fontSize: 14, color: 'var(--c-text-hi)', fontWeight: 600, marginBottom: 8, fontFamily: 'var(--font-sans)' }}>
+          Delete chat?
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--c-text-lo)', lineHeight: 1.6, marginBottom: 20, fontFamily: 'var(--font-sans)' }}>
+          "<span style={{ color: 'var(--c-text-mid)' }}>{title}</span>" will be permanently deleted including all messages and embeddings.
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: '6px 16px', background: 'transparent',
+              border: '1px solid var(--c-divider)',
+              borderRadius: 4, color: 'var(--c-text-mid)', fontSize: 12, cursor: 'pointer',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding: '6px 16px',
+              background: 'rgba(244,71,71,0.15)',
+              border: '1px solid rgba(244,71,71,0.45)',
+              borderRadius: 4, color: 'var(--c-red)', fontSize: 12, cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontWeight: 600,
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────
+export type RightPanelType = 'docs' | 'memory' | 'settings' | null;
+
 interface SidebarProps {
-  isOpen: boolean;
   chats: Chat[];
   currentChatId: string | null;
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
   onDeleteChat: (chatId: string) => void;
-  isDark: boolean;
+  onRenameChat?: (chatId: string, newTitle: string) => void;
+  rightPanel: RightPanelType;
+  onRightPanelChange: (panel: RightPanelType) => void;
   isCreatingChat?: boolean;
 }
 
+// ── Sidebar ────────────────────────────────────────────────────────────────
 export function Sidebar({
-  isOpen,
   chats,
   currentChatId,
   onSelectChat,
   onNewChat,
   onDeleteChat,
-  isDark,
+  onRenameChat,
+  rightPanel,
+  onRightPanelChange,
   isCreatingChat = false,
 }: SidebarProps) {
-  const [sidebarWidth, setSidebarWidth] = useState(256); // 16rem = 256px (w-64)
-  const [isResizing, setIsResizing] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [search, setSearch] = useState('');
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameVal, setRenameVal] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Chat | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
-      
-      const newWidth = e.clientX;
-      if (newWidth >= 200 && newWidth <= 600) { // Min 200px, max 600px
-        setSidebarWidth(newWidth);
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      document.body.style.cursor = 'default';
-      document.body.style.userSelect = 'auto';
-    };
-
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus();
     }
+  }, [renamingId]);
 
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing]);
+  const filteredChats = chats.filter((c) =>
+    (c.title || 'Untitled').toLowerCase().includes(search.toLowerCase())
+  );
 
-  const handleResizeStart = () => {
-    setIsResizing(true);
-  };
+  function startRename(chat: Chat) {
+    setRenamingId(chat.id);
+    setRenameVal(chat.title || 'Untitled');
+  }
 
-  return (
-    <div
-      ref={sidebarRef}
-      className={`${
-        isOpen ? '' : 'w-0'
-      } transition-all duration-300 overflow-hidden bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col relative`}
-      style={{ width: isOpen ? `${sidebarWidth}px` : '0px' }}
-    >
-      {/* Resize handle */}
-      {isOpen && (
+  function commitRename() {
+    if (renamingId && renameVal.trim() && onRenameChat) {
+      onRenameChat(renamingId, renameVal.trim());
+    }
+    setRenamingId(null);
+  }
+
+  function confirmDelete() {
+    if (deleteTarget) {
+      onDeleteChat(deleteTarget.id);
+      setDeleteTarget(null);
+    }
+  }
+
+  function getRelativeTime(dateStr: string): string {
+    try {
+      const diff = Date.now() - new Date(dateStr).getTime();
+      const minutes = Math.floor(diff / 60000);
+      if (minutes < 1) return 'just now';
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days === 1) return 'Yesterday';
+      if (days < 7) return `${days}d ago`;
+      return new Date(dateStr).toLocaleDateString();
+    } catch {
+      return '';
+    }
+  }
+
+  const navItems: { id: RightPanelType; Icon: React.FC<{ size?: number }>; label: string }[] = [
+    { id: 'docs', Icon: DocIcon, label: 'Documents' },
+    { id: 'memory', Icon: BrainIcon, label: 'Memory' },
+    { id: 'settings', Icon: GearIcon, label: 'Settings' },
+  ];
+
+  // ── Collapsed rail ──
+  if (collapsed) {
+    return (
+      <div style={{
+        width: 48, background: 'var(--c-surface)',
+        borderRight: '1px solid var(--c-border)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', padding: '10px 0', gap: 4, flexShrink: 0,
+      }}>
         <div
-          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors z-10"
-          onMouseDown={handleResizeStart}
-          style={{ cursor: 'col-resize' }}
-        />
-      )}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+          onClick={() => setCollapsed(false)}
+          title="Expand"
+          style={{
+            width: 26, height: 26, borderRadius: 5,
+            background: 'linear-gradient(135deg,#4EC9B0,#569CD6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, color: 'var(--c-bg)', fontWeight: 700,
+            fontFamily: 'var(--font-mono)', cursor: 'pointer', marginBottom: 6,
+          }}
+        >
+          AI
+        </div>
+        <button
+          onClick={() => setCollapsed(false)}
+          title="Expand sidebar"
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-text-lo)' }}
+        >
+          <ChevR size={14} />
+        </button>
         <button
           onClick={onNewChat}
+          title="New Chat"
           disabled={isCreatingChat}
-          className={`w-full px-4 py-2 rounded-lg transition flex items-center justify-center gap-2 ${
-            isCreatingChat
-              ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
+          style={{
+            width: 28, height: 28, background: 'transparent',
+            border: '1px solid rgba(78,201,176,0.35)',
+            borderRadius: 4, color: 'var(--c-teal)', fontSize: 17, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginTop: 4, marginBottom: 8,
+          }}
         >
-          {isCreatingChat ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Creating...
-            </>
-          ) : (
-            <>
-              <Plus size={18} />
-              New Chat
-            </>
-          )}
+          +
         </button>
+        <div style={{ flex: 1 }} />
+        {navItems.map(({ id, Icon, label }) => (
+          <button
+            key={id}
+            title={label}
+            onClick={() => onRightPanelChange(rightPanel === id ? null : id)}
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center',
+              color: rightPanel === id ? 'var(--c-teal)' : 'var(--c-text-lo)',
+              transition: 'color 0.15s',
+            }}
+          >
+            <Icon size={16} />
+          </button>
+        ))}
       </div>
+    );
+  }
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {chats.length === 0 ? (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
-            No chats yet
-          </p>
-        ) : (
-          chats.map((chat) => (
-            <div
-              key={chat.id}
-              className={`p-3 rounded-lg cursor-pointer transition flex items-center justify-between group ${
-                currentChatId === chat.id
-                  ? 'bg-blue-100 dark:bg-blue-900'
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-800'
-              }`}
+  // ── Expanded sidebar ──
+  return (
+    <>
+      {deleteTarget && (
+        <DeleteModal
+          title={deleteTarget.title || 'Untitled'}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+      <div style={{
+        width: 232, background: 'var(--c-surface)',
+        borderRight: '1px solid var(--c-border)',
+        display: 'flex', flexDirection: 'column', flexShrink: 0,
+        fontFamily: 'var(--font-mono)',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '10px 12px 10px 14px',
+          borderBottom: '1px solid var(--c-border)',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <div style={{
+            width: 22, height: 22, borderRadius: 4,
+            background: 'linear-gradient(135deg,#4EC9B0,#569CD6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 12, color: 'var(--c-bg)', fontWeight: 700, flexShrink: 0,
+          }}>
+            AI
+          </div>
+          <span style={{ fontSize: 13, color: 'var(--c-text-mid)', fontWeight: 600, letterSpacing: '0.06em', flex: 1 }}>
+            ElectronAIChat
+          </span>
+          <button
+            onClick={() => setCollapsed(true)}
+            title="Collapse sidebar"
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: 'var(--c-text-faint)', padding: 2, borderRadius: 3, display: 'flex', alignItems: 'center',
+            }}
+          >
+            <ChevL size={14} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: '8px 10px 4px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'var(--c-input)', borderRadius: 4, padding: '5px 9px',
+          }}>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+              <circle cx="6.5" cy="6.5" r="5.5" stroke="var(--c-text-lo)" strokeWidth="1.5"/>
+              <path d="M11 11L15 15" stroke="var(--c-text-lo)" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search chats…"
+              style={{
+                background: 'transparent', border: 'none', outline: 'none',
+                color: 'var(--c-text-mid)', fontSize: 12, fontFamily: 'var(--font-mono)', width: '100%',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* New Chat */}
+        <div style={{ padding: '4px 10px 6px' }}>
+          <button
+            onClick={onNewChat}
+            disabled={isCreatingChat}
+            style={{
+              width: '100%', padding: '6px 10px', background: 'transparent',
+              border: '1px solid rgba(78,201,176,0.3)',
+              borderRadius: 4, color: 'var(--c-teal)', fontSize: 12, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              fontFamily: 'var(--font-mono)', opacity: isCreatingChat ? 0.6 : 1,
+            }}
+          >
+            <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
+            {isCreatingChat ? 'Creating…' : 'New Chat'}
+          </button>
+        </div>
+
+        {/* Section label */}
+        <div style={{
+          fontSize: 11, color: 'var(--c-text-faint)', letterSpacing: '0.1em',
+          textTransform: 'uppercase', padding: '6px 14px 3px',
+        }}>
+          Recent
+        </div>
+
+        {/* Chat list */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {filteredChats.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--c-text-faint)', textAlign: 'center', padding: '16px 0', fontFamily: 'var(--font-mono)' }}>
+              No chats yet
+            </p>
+          ) : (
+            filteredChats.map((chat) => {
+              const isActive = currentChatId === chat.id;
+              const isHov = hoveredId === chat.id;
+              const isRen = renamingId === chat.id;
+              return (
+                <div
+                  key={chat.id}
+                  onClick={() => !isRen && onSelectChat(chat.id)}
+                  onMouseEnter={() => setHoveredId(chat.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  style={{
+                    padding: '7px 8px 7px 12px', cursor: isRen ? 'default' : 'pointer',
+                    background: isActive ? 'rgba(78,201,176,0.07)' : isHov ? 'rgba(255,255,255,0.03)' : 'transparent',
+                    borderLeft: isActive ? '2px solid var(--c-teal)' : '2px solid transparent',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    transition: 'background 0.1s',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {isRen ? (
+                      <input
+                        ref={renameInputRef}
+                        value={renameVal}
+                        onChange={(e) => setRenameVal(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRename();
+                          if (e.key === 'Escape') setRenamingId(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '100%', background: 'var(--c-input)',
+                          border: '1px solid var(--c-teal)', borderRadius: 3,
+                          padding: '2px 6px', color: 'var(--c-text-hi)', fontSize: 12,
+                          fontFamily: 'var(--font-mono)', outline: 'none',
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <div style={{
+                          fontSize: 12, color: isActive ? 'var(--c-text-hi)' : 'var(--c-text-faint)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {chat.title || 'Untitled'}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--c-text-faint)', marginTop: 2 }}>
+                          {getRelativeTime(chat.updatedAt || chat.createdAt)}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div style={{
+                    display: 'flex', gap: 0, flexShrink: 0,
+                    opacity: (isHov || isRen || isActive) ? 1 : 0,
+                    transition: 'opacity 0.15s',
+                  }}>
+                    {isRen ? (
+                      <>
+                        <button
+                          title="Save"
+                          onClick={(e) => { e.stopPropagation(); commitRename(); }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-teal)', display: 'flex', alignItems: 'center' }}
+                        >
+                          <CheckIcon />
+                        </button>
+                        <button
+                          title="Cancel"
+                          onClick={(e) => { e.stopPropagation(); setRenamingId(null); }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-text-lo)', display: 'flex', alignItems: 'center' }}
+                        >
+                          <XIcon />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          title="Rename"
+                          onClick={(e) => { e.stopPropagation(); startRename(chat); }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-text-lo)', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--c-text-mid)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--c-text-lo)')}
+                        >
+                          <PencilIcon />
+                        </button>
+                        <button
+                          title="Delete"
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(chat); }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: 'var(--c-text-lo)', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--c-red)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--c-text-lo)')}
+                        >
+                          <TrashIcon />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Bottom nav */}
+        <div style={{
+          borderTop: '1px solid var(--c-border)', padding: '8px 10px',
+          display: 'flex', justifyContent: 'space-around',
+        }}>
+          {navItems.map(({ id, Icon, label }) => (
+            <button
+              key={id}
+              title={label}
+              onClick={() => onRightPanelChange(rightPanel === id ? null : id)}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center',
+                color: rightPanel === id ? 'var(--c-teal)' : 'var(--c-text-lo)',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => { if (rightPanel !== id) (e.currentTarget as HTMLButtonElement).style.color = 'var(--c-text-mid)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = rightPanel === id ? 'var(--c-teal)' : 'var(--c-text-lo)'; }}
             >
-              <button
-                onClick={() => onSelectChat(chat.id)}
-                className="flex-1 text-left truncate text-sm relative group/title flex items-center gap-2"
-                title={chat.title || 'Untitled'} // Native browser tooltip
-              >
-                {chat.isStreaming && (
-                  <Loader2 size={14} className="animate-spin text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                )}
-                <span className="truncate block flex-1">
-                  {chat.title || 'Untitled'}
-                </span>
-                {/* Enhanced tooltip on hover */}
-                {chat.title && chat.title.length > 20 && (
-                  <span className="absolute left-0 bottom-full mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/title:opacity-100 transition-opacity pointer-events-none whitespace-normal max-w-xs z-20">
-                    {chat.title}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => onDeleteChat(chat.id)}
-                className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900 rounded transition flex-shrink-0"
-                title="Delete chat"
-              >
-                <Trash2 size={16} className="text-red-600" />
-              </button>
-            </div>
-          ))
-        )}
+              <Icon size={16} />
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,50 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Default light theme variables */
+/* Light theme base — app defaults to dark via .dark class applied in index.html */
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --border: #e2e8f0;
-  --accent: #3b82f6;
+  --c-bg: #F3F3F3;
+  --c-surface: #FFFFFF;
+  --c-raised: #EBEBEB;
+  --c-border: #CCCCCC;
+  --c-divider: rgba(0,0,0,0.08);
+  --c-input: #E5E5E5;
+  --c-teal: #007C74;
+  --c-blue: #0070C1;
+  --c-yellow: #795E26;
+  --c-orange: #A31515;
+  --c-red: #CD3131;
+  --c-text-hi: #1E1E1E;
+  --c-text-mid: #333333;
+  --c-text-lo: #616161;
+  --c-text-faint: #AAAAAA;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-sans: 'Segoe UI', system-ui, sans-serif;
+  --bg-primary: #F3F3F3;
+  --bg-secondary: #FFFFFF;
+  --text-primary: #1E1E1E;
+  --text-secondary: #333333;
+  --border: #CCCCCC;
+  --accent: #007C74;
 }
 
-/* Dark theme overrides */
-html.dark,
+/* Dark theme override */
 .dark {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --accent: #60a5fa;
+  --c-bg: #1E1E1E;
+  --c-surface: #252526;
+  --c-raised: #2D2D2D;
+  --c-border: #1A1A1A;
+  --c-divider: rgba(255,255,255,0.06);
+  --c-input: #3C3C3C;
+  --c-teal: #4EC9B0;
+  --c-blue: #569CD6;
+  --c-yellow: #DCDCAA;
+  --c-orange: #CE9178;
+  --c-red: #F44747;
+  --c-text-hi: #E8E8E8;
+  --c-text-mid: #CCCCCC;
+  --c-text-lo: #858585;
+  --c-text-faint: #555555;
+  --bg-primary: #1E1E1E;
+  --bg-secondary: #252526;
+  --text-primary: #E8E8E8;
+  --text-secondary: #CCCCCC;
+  --border: #1A1A1A;
+  --accent: #4EC9B0;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  background-color: var(--c-bg);
+  color: var(--c-text-hi);
   overflow: hidden;
-}
-
-html.dark {
-  color-scheme: dark;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 #root {
@@ -52,10 +76,10 @@ html.dark {
   width: 100vw;
 }
 
-/* Custom scrollbar */
+/* Thin scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -63,20 +87,12 @@ html.dark {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
+  background: var(--c-input);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
-html.dark ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-}
-
-html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: var(--c-text-faint);
 }
 
 /* Focus styles */
@@ -86,16 +102,49 @@ select:focus {
   outline: none;
 }
 
-/* Animation for loading spinner */
+/* Streaming cursor blink animation */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Streaming pulse dot animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Loading bounce animation */
 @keyframes bounce {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1s infinite;
 }
 
 .animate-bounce {
   animation: bounce 1.4s infinite;
+}
+
+/* Screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

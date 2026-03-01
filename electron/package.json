@@ -53,10 +53,14 @@
     }
   },
   "dependencies": {
+    "@types/react-syntax-highlighter": "^15.5.13",
     "lucide-react": "^0.546.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-feather": "^2.0.10",
-    "react-router-dom": "^7.9.4"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.9.4",
+    "react-syntax-highlighter": "^16.1.0",
+    "remark-gfm": "^4.0.1"
   }
 }

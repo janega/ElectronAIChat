@@ -4,5 +4,8 @@ export { MessageInput } from './MessageInput';
 export { ChatControls } from './ChatControls';
 export { ModelBar } from './ModelBar';
 export { Sidebar } from './Sidebar';
+export type { RightPanelType } from './Sidebar';
 export { SettingsPage } from './SettingsPage';
+export { DocsPanel } from './DocsPanel';
+export { MemoryPanel } from './MemoryPanel';
 export { UsernameModal } from './UsernameModal';
