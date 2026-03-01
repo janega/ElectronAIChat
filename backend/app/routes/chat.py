@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.config import logger, DEFAULT_SETTINGS
 from app.database import Message, Chat, User, UserSettings
+from app.search import web_search, agentic_search
 from .dependencies import get_langchain_manager, get_mem0_manager, get_openai_client, DBSession
 from .chats import generate_title_background
 from sqlmodel import select
@@ -158,7 +159,37 @@ async def chat_stream(
             else:
                 logger.info(f"Skipping ChromaDB query (searchMode={payload.searchMode})")
 
-            # 2. Retrieve user memory context
+            # 2. Web search context (manual_search / agentic_search modes)
+            web_context = ""
+            if payload.searchMode == "manual_search":
+                try:
+                    logger.info(f"Manual web search for: {payload.message[:80]}")
+                    web_context = await web_search(payload.message)
+                    logger.info(f"Web search returned {len(web_context)} chars")
+                except Exception:
+                    logger.exception("Manual web search failed – continuing without results")
+            elif payload.searchMode == "agentic_search":
+                try:
+                    logger.info(f"Agentic web search for: {payload.message[:80]}")
+                    # Pass system prompt + user message so the LLM has enough context
+                    # to decide whether a web search is actually needed.
+                    _agentic_msgs = [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": payload.message},
+                    ]
+                    web_context, _ = await agentic_search(
+                        query=payload.message,
+                        messages=_agentic_msgs,
+                        openai_client=openai_client,
+                    )
+                    if web_context:
+                        logger.info(f"Agentic search returned {len(web_context)} chars")
+                    else:
+                        logger.info("Agentic search: LLM skipped web search")
+                except Exception:
+                    logger.exception("Agentic web search failed – continuing without results")
+
+            # 3. Retrieve user memory context
             mem0_context = ""
             memory_used = False
             if payload.useMemory:
@@ -192,18 +223,22 @@ async def chat_stream(
             else:
                 logger.info(f"Skipping Mem0 query (useMemory={payload.useMemory})")
 
-            # 3. Build conversation messages with context
+            # 4. Build conversation messages with context
             messages = [{"role": "system", "content": system_prompt}]
             
-            # Add context in order of priority
+            # Inject context in priority order: memory → documents → web results.
+            # Memory gives personalisation, documents provide authoritative local
+            # knowledge, and web results supply the freshest information.
             if mem0_context:
                 messages.append({"role": "system", "content": mem0_context})
             if doc_context:
                 messages.append({"role": "system", "content": doc_context})
+            if web_context:
+                messages.append({"role": "system", "content": f"--- Web Search Results ---\n{web_context}"})
 
             messages.append({"role": "user", "content": payload.message})
 
-            # 4. Stream response tokens
+            # 5. Stream response tokens
             full_response = ""
             async for chunk in openai_client.create_chat_completion(
                 model=model,
@@ -231,6 +266,14 @@ async def chat_stream(
                     'filename': 'Long-term Memory',
                     'chatId': payload.chatId,
                     'type': 'memory'
+                })
+            
+            # Add web search source if web context was used
+            if web_context:
+                sources.append({
+                    'filename': 'Web Search',
+                    'chatId': payload.chatId,
+                    'type': 'web'
                 })
             
             # Send final event with sources
